@@ -662,11 +662,13 @@ static char kRSMenuController;
 		if (CGRectContainsPoint(activeFrame, loc)) {
 			UIViewController *vc = _top;
 			while ([vc isKindOfClass:[UINavigationController class]]) {
+				if (vc.presentedViewController) return NO;
 				if ([vc respondsToSelector:@selector(panEnabled)]) {
 					return ((BOOL (*)(id, SEL))objc_msgSend)(vc, @selector(panEnabled));
 				}
 				vc = [(UINavigationController *)vc topViewController];
 			}
+			if (vc.presentedViewController) return NO;
 			if ([vc respondsToSelector:@selector(panEnabled)]) {
 				return ((BOOL (*)(id, SEL))objc_msgSend)(vc, @selector(panEnabled));
 			}
