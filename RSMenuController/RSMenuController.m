@@ -14,17 +14,18 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 
-@implementation UIView (RS)
+@implementation UIView (RSMenuController)
 
-- (void)showShadow:(BOOL)val
+- (void)showShadow:(CGFloat)radius
 {
-	self.layer.shadowOpacity = val ? 1 : 0;
-	if (val) {
-		self.layer.cornerRadius = 4.0f;
+	if (radius) {
+		self.layer.shadowOpacity = 1;
 		self.layer.shadowOffset = CGSizeZero;
-		self.layer.shadowRadius = 5.0f;
+		self.layer.shadowRadius = radius;
 		self.layer.shadowColor = [UIColor blackColor].CGColor;
 		self.layer.shadowPath = [UIBezierPath bezierPathWithRect:self.bounds].CGPath;
+	} else {
+		self.layer.shadowRadius = 0;
 	}
 }
 
@@ -97,6 +98,7 @@ static char kRSMenuController;
 @synthesize topViewController=_top;
 @synthesize rightViewControllers=_right, leftViewControllers=_left;
 @synthesize rootViewController=_root;
+@synthesize foldedShadowRadius;
 @synthesize resistanceForce, swipeDuration, bounceDuration, keepSpeed;
 
 - (id)initWithRootViewController:(UIViewController *)controller margin:(CGFloat)margin
@@ -107,6 +109,7 @@ static char kRSMenuController;
 		resistanceForce = 15.0f;
 		swipeDuration = .25f;
 		bounceDuration = .2f;
+		foldedShadowRadius = 10.f;
 		keepSpeed = YES;
 		_currentFold = nil;
 		_top = nil;
@@ -414,9 +417,9 @@ static char kRSMenuController;
 	BOOL offScreen = ABS(destX) >= self.view.bounds.size.width;
 	
 	if (destX == 0 || offScreen) {
-		[viewController.view showShadow:NO];
+		[viewController.view showShadow:0];
 	} else {
-		[viewController.view showShadow:YES];
+		[viewController.view showShadow:foldedShadowRadius];
 	}
 	
 	CGRect frame = viewController.view.frame;
@@ -597,7 +600,7 @@ static char kRSMenuController;
 			_panning = _top;
 			[_top.view endEditing:NO];
 		}
-		[_panning.view showShadow:YES];
+		[_panning.view showShadow:foldedShadowRadius];
 		NSLog(@"_top%s = %@ _currentFold = %@", _panning == _top ? "(panning)" : "", _top,  _currentFold);
 		_panOriginX = _panning.view.frame.origin.x;
 	} else if (gesture.state == UIGestureRecognizerStateChanged) {

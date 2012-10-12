@@ -30,6 +30,7 @@ typedef enum {
 
 @property (nonatomic, assign) CGFloat resistanceForce;
 @property (nonatomic, assign) CGFloat swipeDuration;
+@property (nonatomic, assign) CGFloat foldedShadowRadius;
 @property (nonatomic, assign) CGFloat bounceDuration;
 @property (nonatomic, assign) BOOL keepSpeed;
 
