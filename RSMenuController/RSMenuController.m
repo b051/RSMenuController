@@ -39,7 +39,7 @@
 		BOOL iOS4 = !self.childViewControllers;
 		if (iOS4) [self viewWillDisappear:NO];
 		[self.view removeFromSuperview];
-		NSLog(@"hide vc %@", self);
+		RMLog(@"hide vc %@", self);
 		if (iOS4) [self viewDidDisappear:NO];
 	}
 }
@@ -52,7 +52,7 @@
 		BOOL iOS4 = !self.childViewControllers;
 		if (iOS4) [self viewWillAppear:NO];
 		self.view.frame = rect;
-		NSLog(@"show vc %@", self);
+		RMLog(@"show vc %@", self);
 		[superview insertSubview:self.view atIndex:0];
 		if (iOS4) [self viewDidAppear:NO];
 	}
@@ -298,7 +298,7 @@ static char kRSMenuController;
 - (void)showViewController:(UIViewController *)controller animated:(BOOL)animated
 {
 	if (_top != controller) {
-		NSLog(@"setTop in showViewController:animated:");
+		RMLog(@"setTop in showViewController:animated:");
 		[self setTopViewController:controller];
 		[self moveViewControllersAccordingToTopIndexAnimated:animated except:_top];
 		[self moveViewController:_top toX:0 animated:animated completion:^(BOOL finished) {
@@ -313,7 +313,7 @@ static char kRSMenuController;
 	_top = controller;
 	_top.view.userInteractionEnabled = YES;
 	_top.menuController = self;
-	NSLog(@"new top %@", _top);
+	RMLog(@"new top %@", _top);
 	if (_top == rootViewController) {
 		_topIndex = 0;
 		
@@ -322,7 +322,7 @@ static char kRSMenuController;
 		_currentFold = nil;
 		_swipe.enabled = NO;
 		activeFrame = self.view.bounds;
-		NSLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
+		RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
 		
 		return;
 	}
@@ -343,7 +343,7 @@ static char kRSMenuController;
 				_currentFold = [self.leftViewControllers objectAtIndex:index - 1];
 			}
 			_currentFold.view.userInteractionEnabled = NO;
-			NSLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
+			RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
 			return;
 		}
 	}
@@ -364,7 +364,7 @@ static char kRSMenuController;
 				_currentFold = [self.rightViewControllers objectAtIndex:index - 1];
 			}
 			_currentFold.view.userInteractionEnabled = NO;
-			NSLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
+			RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
 			return;
 		}
 	}
@@ -391,7 +391,7 @@ static char kRSMenuController;
 	for (UIViewController *vc in array) {
 		if (vc != _top) {
 			if (start) {
-				NSLog(@"hide vc %@", vc);
+				RMLog(@"hide vc %@", vc);
 				[vc RS_hide];
 			} else {
 				[vc RS_show];
@@ -497,7 +497,7 @@ static char kRSMenuController;
 	} else {
 		if (showingRightView) {
 			if (reachRightEnd) return YES;
-			NSLog(@"_panning %@, _currentFold %@", _panning, _currentFold);
+			RMLog(@"_panning %@, _currentFold %@", _panning, _currentFold);
 			if (_panning == _currentFold) {
 				return YES;
 			}
@@ -519,7 +519,7 @@ static char kRSMenuController;
 	CGFloat finalX = _panning.view.frame.origin.x;
 	if (_panOriginX > 0) finalX = MAX(0, finalX);
 	if (_panOriginX < 0) finalX = MIN(0, finalX);
-	NSLog(@"finalX = %f", finalX);
+	RMLog(@"finalX = %f", finalX);
 	
 	CGFloat width = _panning.view.frame.size.width;
 	CGFloat destX;
@@ -535,10 +535,10 @@ static char kRSMenuController;
 			bounce = NO;
 		} else {
 			if (_panning == _currentFold) {
-				NSLog(@"setTop in finishAnimation:");
+				RMLog(@"setTop in finishAnimation:");
 				[self setTopViewController:_currentFold];
 			} else {
-				NSLog(@"setTop in finishAnimation:");
+				RMLog(@"setTop in finishAnimation:");
 				[self setTopViewController:[self oneViewControllerLeft]];
 			}
 			destX = showingLeftView ? (width - _margin) : 0;
@@ -553,10 +553,10 @@ static char kRSMenuController;
 			bounce = NO;
 		} else {
 			if (_panning == _currentFold) {
-				NSLog(@"setTop in finishAnimation:");
+				RMLog(@"setTop in finishAnimation:");
 				[self setTopViewController:_currentFold];
 			} else {
-				NSLog(@"setTop in finishAnimation:");
+				RMLog(@"setTop in finishAnimation:");
 				[self setTopViewController:[self oneViewControllerRight]];
 			}
 			destX = showingRightView ? (_margin - width) : 0;
@@ -577,7 +577,7 @@ static char kRSMenuController;
 	if (bounce) {
 		duration = MIN(duration, span / absVelocity); // bouncing we'll use the current velocity to determine
 	}
-	//NSLog(@"%f => %f, destX = %f, duration = %f", _panOriginX, finalX, destX, duration);
+	//RMLog(@"%f => %f, destX = %f, duration = %f", _panOriginX, finalX, destX, duration);
 	
 	CALayer *layer = _panning.view.layer;
 	[CATransaction begin];
@@ -611,7 +611,7 @@ static char kRSMenuController;
 
 - (void)swipe:(RSSwipeGestureRecognizer *)gesture
 {
-	//	NSLog(@"swipe %d", gesture.state);
+	//	RMLog(@"swipe %d", gesture.state);
 	if (gesture.state == UIGestureRecognizerStateRecognized) {
 		if (_topIndex < 0) {
 			[self showViewController:[self oneViewControllerRight] animated:YES];
@@ -632,7 +632,7 @@ static char kRSMenuController;
 			[_top.view endEditing:NO];
 		}
 		[_panning.view RS_showShadow:foldedShadowRadius];
-		NSLog(@"_top%s = %@ _currentFold = %@", _panning == _top ? "(panning)" : "", _top,  _currentFold);
+		RMLog(@"_top%s = %@ _currentFold = %@", _panning == _top ? "(panning)" : "", _top,  _currentFold);
 		_panOriginX = _panning.view.frame.origin.x;
 	} else if (gesture.state == UIGestureRecognizerStateChanged) {
 		CGPoint translation = [gesture translationInView:self.view];
@@ -671,13 +671,13 @@ static char kRSMenuController;
 		CGFloat velocity = [gesture velocityInView:self.view].x;
 		[self finishAnimation:velocity];
 	} else if (gesture.state == UIGestureRecognizerStateCancelled) {
-		NSLog(@"pan canceled");
+		RMLog(@"pan canceled");
 	}
 }
 
 - (void)tap:(UITapGestureRecognizer *)gesture
 {
-	NSLog(@"tap to show currentFold %@", _currentFold);
+	RMLog(@"tap to show currentFold %@", _currentFold);
 	[self showViewController:_currentFold animated:YES];
 }
 

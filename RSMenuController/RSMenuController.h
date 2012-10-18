@@ -8,6 +8,26 @@
 
 #import <UIKit/UIKit.h>
 
+#ifndef RS_ENABLE_MENU_CONTROLLER_LOGGING
+#ifdef DEBUG
+#define RS_ENABLE_MENU_CONTROLLER_LOGGING 1
+#else
+#define RS_ENABLE_MENU_CONTROLLER_LOGGING 0
+#endif
+#endif
+
+#if RS_ENABLE_MENU_CONTROLLER_LOGGING != 0
+// First, check if we can use Cocoalumberjack for logging
+#ifdef LOG_VERBOSE
+extern int ddLogLevel;
+#define RMLog(...)  DDLogVerbose(__VA_ARGS__)
+#else
+#define RMLog(...) NSLog(@"%s(%p) %@", __PRETTY_FUNCTION__, self, [NSString stringWithFormat:__VA_ARGS__])
+#endif
+#else
+#define RMLog(...) ((void)0)
+#endif
+
 typedef enum {
 	RSMenuPanDirectionLeft = 0,
 	RSMenuPanDirectionRight,
