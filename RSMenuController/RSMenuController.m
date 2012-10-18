@@ -16,7 +16,7 @@
 
 @implementation UIView (RSMenuController)
 
-- (void)showShadow:(CGFloat)radius
+- (void)RS_showShadow:(CGFloat)radius
 {
 	if (radius) {
 		self.layer.shadowOpacity = 1;
@@ -31,23 +31,7 @@
 
 @end
 
-@implementation UIViewController (RSMenuController)
-
-static char kRSMenuController;
-
-- (RSMenuController *)menuController
-{
-	return objc_getAssociatedObject(self, &kRSMenuController);
-}
-
-- (void)setMenuController:(RSMenuController *)menuController
-{
-	if ([self respondsToSelector:@selector(viewControllers)]) {
-		id viewControllers = objc_msgSend(self, @selector(viewControllers));
-		[viewControllers setValue:menuController forKeyPath:@"menuController"];
-	}
-	objc_setAssociatedObject(self, &kRSMenuController, menuController, OBJC_ASSOCIATION_ASSIGN);
-}
+@implementation UIViewController (RS_iOS4)
 
 - (void)RS_hide
 {
@@ -76,6 +60,29 @@ static char kRSMenuController;
 
 @end
 
+@implementation UIViewController (RSMenuController)
+
+static char kRSMenuController;
+
+- (RSMenuController *)menuController
+{
+	return objc_getAssociatedObject(self, &kRSMenuController);
+}
+
+- (void)setMenuController:(RSMenuController *)menuController
+{
+	if ([self respondsToSelector:@selector(viewControllers)]) {
+		id viewControllers = objc_msgSend(self, @selector(viewControllers));
+		[viewControllers setValue:menuController forKeyPath:@"menuController"];
+	}
+	objc_setAssociatedObject(self, &kRSMenuController, menuController, OBJC_ASSOCIATION_ASSIGN);
+}
+
+@end
+
+@interface RSMenuController () <UIGestureRecognizerDelegate, UINavigationControllerDelegate>
+
+@end
 
 @implementation RSMenuController
 {
@@ -93,19 +100,20 @@ static char kRSMenuController;
 	BOOL reachRightEnd;
 	BOOL showingLeftView;
 	BOOL showingRightView;
+	__weak id originalNavigationControllerDelegate;
 }
 
 @synthesize topViewController=_top;
-@synthesize rightViewControllers=_right, leftViewControllers=_left;
-@synthesize rootViewController=_root;
+@synthesize rightViewControllers=rightViewControllers, leftViewControllers;
+@synthesize rootViewController;
 @synthesize foldedShadowRadius;
 @synthesize resistanceForce, swipeDuration, bounceDuration, keepSpeed;
 
-- (id)initWithRootViewController:(UIViewController *)controller margin:(CGFloat)margin
+- (id)initWithRootViewController:(UINavigationController *)controller margin:(CGFloat)margin
 {
 	if (self = [super init]) {
 		_margin = margin;
-		_root = controller;
+		rootViewController = controller;
 		resistanceForce = 15.0f;
 		swipeDuration = .25f;
 		bounceDuration = .2f;
@@ -118,25 +126,48 @@ static char kRSMenuController;
 	return self;
 }
 
-- (void)didReceiveMemoryWarning
+- (void)setLeftViewControllers:(NSArray *)_leftViewControllers
 {
-	[super didReceiveMemoryWarning];
+	for (UIViewController *vc in leftViewControllers)
+		vc.menuController = nil;
+	leftViewControllers = _leftViewControllers;
+	for (UIViewController *vc in leftViewControllers)
+		vc.menuController = self;
 }
 
-- (void)setLeftViewControllers:(NSArray *)leftViewControllers
+- (void)setRightViewControllers:(NSArray *)_rightViewControllers
 {
-	for (UIViewController *vc in leftViewControllers) {
+	for (UIViewController *vc in rightViewControllers)
+		vc.menuController = nil;
+	rightViewControllers = _rightViewControllers;
+	for (UIViewController *vc in rightViewControllers)
 		vc.menuController = self;
-	}
-	_left = leftViewControllers;
 }
 
-- (void)setRightViewControllers:(NSArray *)rightViewControllers
+- (void)setRootViewControllers:(NSArray *)rootViewControllers
 {
-	for (UIViewController *vc in rightViewControllers) {
-		vc.menuController = self;
+	[self setRootViewControllers:rootViewControllers animated:NO];
+}
+
+- (void)setRootViewControllers:(NSArray *)rootViewControllers animated:(BOOL)animated
+{
+	if (animated) {
+		originalNavigationControllerDelegate = rootViewController.delegate;
+		rootViewController.delegate = self;
+		[self moveViewController:_currentFold toX:self.view.bounds.size.width animated:YES completion:^(BOOL success) {
+			if ([rootViewController.viewControllers isEqualToArray:rootViewControllers]) {
+				[self navigationController:rootViewController didShowViewController:nil animated:YES];
+			} else
+				rootViewController.viewControllers = rootViewControllers;
+		}];
+	} else {
+		rootViewController.viewControllers = rootViewControllers;
 	}
-	_right = rightViewControllers;
+}
+
+- (NSArray *)rootViewControllers
+{
+	return [rootViewController viewControllers];
 }
 
 #pragma mark - View Lifecycle
@@ -145,12 +176,12 @@ static char kRSMenuController;
 	[super viewDidLoad];
 	self.view.backgroundColor = [UIColor clearColor];
 	BOOL iOS4 = !self.childViewControllers;
-	if (iOS4) [_root viewWillAppear:NO];
-	_root.view.frame = self.view.bounds;
-	[self.view addSubview:_root.view];
-	if (iOS4) [_root viewWillAppear:NO];
+	if (iOS4) [rootViewController viewWillAppear:NO];
+	rootViewController.view.frame = self.view.bounds;
+	[self.view addSubview:rootViewController.view];
+	if (iOS4) [rootViewController viewWillAppear:NO];
 	
-	[self showViewController:_root animated:NO];
+	[self showViewController:rootViewController animated:NO];
 	if (!_tap) {
 		_tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tap:)];
 		_tap.delegate = self;
@@ -188,7 +219,7 @@ static char kRSMenuController;
 #pragma mark -
 - (UIViewController *)viewControllerAtIndex:(NSInteger)index
 {
-	if (index == 0) return _root;
+	if (index == 0) return rootViewController;
 	else if (index > 0) {
 		index--;
 		if (self.rightViewControllers.count > index) {
@@ -258,8 +289,8 @@ static char kRSMenuController;
 			}
 		}
 	} else {
-		if (_root != except) {
-			[self moveViewController:_root toX:0 animated:animated];
+		if (rootViewController != except) {
+			[self moveViewController:rootViewController toX:0 animated:animated];
 		}
 	}
 }
@@ -283,7 +314,7 @@ static char kRSMenuController;
 	_top.view.userInteractionEnabled = YES;
 	_top.menuController = self;
 	NSLog(@"new top %@", _top);
-	if (_top == _root) {
+	if (_top == rootViewController) {
 		_topIndex = 0;
 		
 		reachLeftEnd = self.leftViewControllers.count == 0;
@@ -307,7 +338,7 @@ static char kRSMenuController;
 			CGRect frame = self.view.bounds;
 			activeFrame = CGRectMake(0, 0, frame.size.width - _margin, frame.size.height);
 			if (index == 0) {
-				_currentFold = _root;
+				_currentFold = rootViewController;
 			} else {
 				_currentFold = [self.leftViewControllers objectAtIndex:index - 1];
 			}
@@ -328,7 +359,7 @@ static char kRSMenuController;
 			CGRect frame = self.view.bounds;
 			activeFrame = CGRectMake(_margin, 0, frame.size.width - _margin, frame.size.height);
 			if (index == 0) {
-				_currentFold = _root;
+				_currentFold = rootViewController;
 			} else {
 				_currentFold = [self.rightViewControllers objectAtIndex:index - 1];
 			}
@@ -351,13 +382,7 @@ static char kRSMenuController;
 
 - (void)showRootController
 {
-    [self showViewController:_root animated:NO];
-}
-
-- (void)hideCurrentFold:(BOOL)hide
-{
-	CGRect frame = self.view.bounds;
-    [self moveViewController:_currentFold toX:hide ? frame.size.width : frame.size.width - _margin animated:YES];
+    [self showViewController:rootViewController animated:NO];
 }
 
 - (void)_toggleViewControllersFromCurrentPosition:(NSArray *)array
@@ -384,11 +409,11 @@ static char kRSMenuController;
 	showingLeftView = dir == RSMenuPanDirectionLeft;
 	if (dir == RSMenuPanDirectionLeft) {
 		for (UIViewController *vc in self.rightViewControllers) [vc RS_hide];
-//		[self _toggleViewControllersFromCurrentPosition:self.leftViewControllers];
+		//		[self _toggleViewControllersFromCurrentPosition:self.leftViewControllers];
 		for (UIViewController *vc in self.leftViewControllers) [vc RS_show];
 	} else if (dir == RSMenuPanDirectionRight) {
 		for (UIViewController *vc in self.leftViewControllers) [vc RS_hide];
-//		[self _toggleViewControllersFromCurrentPosition:self.rightViewControllers];
+		//		[self _toggleViewControllersFromCurrentPosition:self.rightViewControllers];
 		for (UIViewController *vc in self.rightViewControllers) [vc RS_show];
 	} else {
 		for (UIViewController *vc in self.leftViewControllers) [vc RS_hide];
@@ -398,7 +423,7 @@ static char kRSMenuController;
 
 - (void)reloadViewControllersIfNecessary
 {
-	CGFloat x = _root.view.frame.origin.x;
+	CGFloat x = rootViewController.view.frame.origin.x;
 	if (x > 0.0f) {
 		[self toggleViewControllersDirection:RSMenuPanDirectionLeft];
 	} else if (x < 0.0f) {
@@ -417,17 +442,23 @@ static char kRSMenuController;
 	BOOL offScreen = ABS(destX) >= self.view.bounds.size.width;
 	
 	if (destX == 0 || offScreen) {
-		[viewController.view showShadow:0];
+		[viewController.view RS_showShadow:0];
 	} else {
-		[viewController.view showShadow:foldedShadowRadius];
+		[viewController.view RS_showShadow:foldedShadowRadius];
 	}
 	
 	CGRect frame = viewController.view.frame;
 	if (viewController == _top && ((destX > 0.0f && reachLeftEnd) || (destX < 0.0f && reachRightEnd))) {
-		if (frame.origin.x == 0.0f) return;
+		if (frame.origin.x == 0.0f) {
+			if (block) block(NO);
+			return;
+		}
 		frame.origin.x = 0.0f;
 	} else {
-		if (frame.origin.x == destX) return;
+		if (frame.origin.x == destX) {
+			if (block) block(NO);
+			return;
+		}
 		frame.origin.x = destX;
 	}
 	if (animated) {
@@ -536,7 +567,7 @@ static char kRSMenuController;
 		return;
 	}
 	
-	if (_panning != _root) {
+	if (_panning != rootViewController) {
 		[self moveViewControllersAccordingToTopIndexAnimated:YES except:_panning];
 	}
 	
@@ -600,7 +631,7 @@ static char kRSMenuController;
 			_panning = _top;
 			[_top.view endEditing:NO];
 		}
-		[_panning.view showShadow:foldedShadowRadius];
+		[_panning.view RS_showShadow:foldedShadowRadius];
 		NSLog(@"_top%s = %@ _currentFold = %@", _panning == _top ? "(panning)" : "", _top,  _currentFold);
 		_panOriginX = _panning.view.frame.origin.x;
 	} else if (gesture.state == UIGestureRecognizerStateChanged) {
@@ -612,8 +643,8 @@ static char kRSMenuController;
 		if (_panOriginX > 0) destX = MAX(0, destX);
 		if (_panOriginX < 0) destX = MIN(0, destX);
 		
-		if (_panning == _root) {
-			[self moveViewController:_root toX:destX animated:NO];
+		if (_panning == rootViewController) {
+			[self moveViewController:rootViewController toX:destX animated:NO];
 			[self reloadViewControllersIfNecessary];
 		} else {
 			if (destX > _panOriginX) {
@@ -693,6 +724,13 @@ static char kRSMenuController;
 		return YES;
 	}
 	return NO;
+}
+
+#pragma mark - UINavigationControllerDelegate
+- (void)navigationController:(UINavigationController *)navigationController didShowViewController:(UIViewController *)viewController animated:(BOOL)animated
+{
+	[self showViewController:rootViewController animated:YES];
+	navigationController.delegate = originalNavigationControllerDelegate;
 }
 
 @end

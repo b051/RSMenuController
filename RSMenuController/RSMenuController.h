@@ -14,19 +14,21 @@ typedef enum {
 	RSMenuPanDirectionNone
 } RSMenuPanDirection;
 
-@interface RSMenuController : UIViewController <UIGestureRecognizerDelegate>
+@interface RSMenuController : UIViewController
 
-- (id)initWithRootViewController:(UIViewController *)controller margin:(CGFloat)margin;
+- (id)initWithRootViewController:(UINavigationController *)controller margin:(CGFloat)margin;
 - (void)showViewController:(UIViewController *)controller animated:(BOOL)animated;
 - (UIViewController *)oneViewControllerLeft;
 - (UIViewController *)oneViewControllerRight;
-- (void)showRootController;
-- (void)hideCurrentFold:(BOOL)hide;
 
+- (void)setRootViewControllers:(NSArray *)rootViewControllers animated:(BOOL)animated;
+
+@property (nonatomic, copy) NSArray *rootViewControllers;
 @property (nonatomic, copy) NSArray *leftViewControllers;
 @property (nonatomic, copy) NSArray *rightViewControllers;
+
 @property (nonatomic, readonly) UIViewController *topViewController;
-@property (nonatomic, readonly) UIViewController *rootViewController;
+@property (nonatomic, readonly) UINavigationController *rootViewController;
 
 @property (nonatomic, assign) CGFloat resistanceForce;
 @property (nonatomic, assign) CGFloat swipeDuration;
