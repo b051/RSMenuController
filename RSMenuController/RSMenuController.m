@@ -223,14 +223,14 @@ static char kRSMenuController;
 	else if (index > 0) {
 		index--;
 		if (self.rightViewControllers.count > index) {
-			return [self.rightViewControllers objectAtIndex:index];
+			return (self.rightViewControllers)[index];
 		} else {
 			return nil;
 		}
 	} else {
 		index = -index - 1;
 		if (self.leftViewControllers.count > index) {
-			return [self.leftViewControllers objectAtIndex:index];
+			return (self.leftViewControllers)[index];
 		} else {
 			return nil;
 		}
@@ -340,7 +340,7 @@ static char kRSMenuController;
 			if (index == 0) {
 				_currentFold = rootViewController;
 			} else {
-				_currentFold = [self.leftViewControllers objectAtIndex:index - 1];
+				_currentFold = (self.leftViewControllers)[index - 1];
 			}
 			_currentFold.view.userInteractionEnabled = NO;
 			RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
@@ -361,7 +361,7 @@ static char kRSMenuController;
 			if (index == 0) {
 				_currentFold = rootViewController;
 			} else {
-				_currentFold = [self.rightViewControllers objectAtIndex:index - 1];
+				_currentFold = (self.rightViewControllers)[index - 1];
 			}
 			_currentFold.view.userInteractionEnabled = NO;
 			RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
