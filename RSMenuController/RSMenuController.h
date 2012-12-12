@@ -34,6 +34,12 @@ typedef enum {
 	RSMenuPanDirectionNone
 } RSMenuPanDirection;
 
+@protocol RSMenuPanEnabledProtocol <NSObject>
+
+- (BOOL)panEnabled;
+
+@end
+
 @interface RSMenuController : UIViewController
 
 - (id)initWithRootViewController:(UINavigationController *)controller margin:(CGFloat)margin;
@@ -61,6 +67,6 @@ typedef enum {
 
 @interface UIViewController (RSMenuController)
 
-- (RSMenuController *)menuController;
+@property (nonatomic, weak, readonly) RSMenuController *menuController;
 
 @end
