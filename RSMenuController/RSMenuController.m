@@ -87,7 +87,7 @@ static char kRSMenuController;
 @interface RSMenuController () <UIGestureRecognizerDelegate, UINavigationControllerDelegate>
 
 @property (nonatomic, weak) RSSwipeGestureRecognizer *swipe;
-@property (nonatomic, weak) UIPanGestureRecognizer *pan;
+@property (nonatomic, weak) RSPanLeftRightGestureRecognizer *pan;
 @property (nonatomic, weak) UITapGestureRecognizer *tap;
 @property (nonatomic, weak) id<UINavigationControllerDelegate> originalNavigationControllerDelegate;
 @property (nonatomic, weak) UIViewController *currentFold;
@@ -279,7 +279,7 @@ static char kRSMenuController;
 		[self setTopViewController:controller];
 		[self moveViewControllersAccordingToTopIndexAnimated:animated except:_topViewController];
 		[self moveViewController:_topViewController toX:0 animated:animated completion:^(BOOL finished) {
-			[self reloadViewControllersIfNecessary];
+			[self reloadViewControllersIfNecessary:YES];
 		}];
 	}
 }
@@ -298,6 +298,7 @@ static char kRSMenuController;
 		reachRightEnd = self.rightViewControllers.count == 0;
 		_currentFold = nil;
 		_swipe.enabled = NO;
+		_pan.directions = UISwipeGestureRecognizerDirectionLeft | UISwipeGestureRecognizerDirectionRight;
 		_activeFrame = self.view.bounds;
 		RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
 		
@@ -311,6 +312,7 @@ static char kRSMenuController;
 			reachRightEnd = NO;
 			_topIndex = -index - 1;
 			_swipe.enabled = YES;
+			_pan.directions = 0;
 			_swipe.direction = UISwipeGestureRecognizerDirectionLeft;
 			CGRect frame = self.view.bounds;
 			_activeFrame = CGRectMake(0, 0, frame.size.width - _margin, frame.size.height);
@@ -332,6 +334,7 @@ static char kRSMenuController;
 			reachRightEnd = index == self.rightViewControllers.count - 1;
 			_topIndex = index + 1;
 			_swipe.enabled = YES;
+			_pan.directions = 0;
 			_swipe.direction = UISwipeGestureRecognizerDirectionRight;
 			CGRect frame = self.view.bounds;
 			_activeFrame = CGRectMake(_margin, 0, frame.size.width - _margin, frame.size.height);
@@ -385,27 +388,29 @@ static char kRSMenuController;
 	showingRightView = dir == RSMenuPanDirectionRight;
 	showingLeftView = dir == RSMenuPanDirectionLeft;
 	if (dir == RSMenuPanDirectionLeft) {
-		for (UIViewController *vc in self.rightViewControllers) [vc RS_hide];
+		for (UIViewController *vc in _rightViewControllers) [vc RS_hide];
 		//		[self _toggleViewControllersFromCurrentPosition:self.leftViewControllers];
-		for (UIViewController *vc in self.leftViewControllers) [vc RS_show];
+		for (UIViewController *vc in _leftViewControllers) [vc RS_show];
 	} else if (dir == RSMenuPanDirectionRight) {
-		for (UIViewController *vc in self.leftViewControllers) [vc RS_hide];
+		for (UIViewController *vc in _leftViewControllers) [vc RS_hide];
 		//		[self _toggleViewControllersFromCurrentPosition:self.rightViewControllers];
-		for (UIViewController *vc in self.rightViewControllers) [vc RS_show];
+		for (UIViewController *vc in _rightViewControllers) [vc RS_show];
 	} else {
-		for (UIViewController *vc in self.leftViewControllers) [vc RS_hide];
-		for (UIViewController *vc in self.rightViewControllers) [vc RS_hide];
+		for (UIViewController *vc in _leftViewControllers) [vc RS_hide];
+		for (UIViewController *vc in _rightViewControllers) [vc RS_hide];
 	}
 }
 
-- (void)reloadViewControllersIfNecessary
+- (void)reloadViewControllersIfNecessary:(BOOL)reset
 {
 	CGFloat x = _rootViewController.view.frame.origin.x;
 	if (x > 0.0f) {
-		[self toggleViewControllersDirection:RSMenuPanDirectionLeft];
-	} else if (x < 0.0f) {
-		[self toggleViewControllersDirection:RSMenuPanDirectionRight];
-	} else {
+		return [self toggleViewControllersDirection:RSMenuPanDirectionLeft];
+	}
+	if (x < 0.0f) {
+		return [self toggleViewControllersDirection:RSMenuPanDirectionRight];
+	}
+	if (reset) {
 		[self toggleViewControllersDirection:RSMenuPanDirectionNone];
 	}
 }
@@ -539,7 +544,7 @@ static char kRSMenuController;
 			destX = showingRightView ? (_margin - width) : 0;
 		}
 	} else {
-		[self reloadViewControllersIfNecessary];
+		[self reloadViewControllersIfNecessary:NO];
 		self.view.userInteractionEnabled = YES;
 		return;
 	}
@@ -559,7 +564,7 @@ static char kRSMenuController;
 	CALayer *layer = _panning.view.layer;
 	[CATransaction begin];
 	[CATransaction setCompletionBlock:^{
-		[self reloadViewControllersIfNecessary];
+		[self reloadViewControllersIfNecessary:YES];
 		[layer removeAllAnimations];
 		self.view.userInteractionEnabled = YES;
 	}];
@@ -622,7 +627,7 @@ static char kRSMenuController;
 		
 		if (_panning == _rootViewController) {
 			[self moveViewController:_rootViewController toX:destX animated:NO];
-			[self reloadViewControllersIfNecessary];
+			[self reloadViewControllersIfNecessary:NO];
 		} else {
 			if (destX > _panOriginX) {
 				if ([self panningLocked:RSMenuPanDirectionRight]) {
@@ -662,15 +667,19 @@ static char kRSMenuController;
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
 {
 	if (gestureRecognizer == _tap) {
-        // if the _currentFold is hidden on the right, do nothing
-        if (_currentFold.view.frame.origin.x > _currentFold.view.bounds.size.width - _margin) {
-            return NO;
-        }
-		if (!_currentFold) return NO;
-		return !CGRectContainsPoint(_activeFrame, [_tap locationInView:self.view]);
-	} else if (gestureRecognizer == _pan) {
-		CGPoint loc = [_pan locationInView:self.view];
-		if (CGRectContainsPoint(_activeFrame, loc)) {
+		return _currentFold && _currentFold.view.frame.origin.x == _currentFold.view.bounds.size.width - _margin;
+	}
+	return YES;
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch
+{
+	BOOL inActiveFrame = CGRectContainsPoint(_activeFrame, [touch locationInView:self.view]);
+	if (gestureRecognizer == _tap) {
+		return !inActiveFrame;
+	}
+	if (gestureRecognizer == _pan) {
+		if (inActiveFrame) {
 			UIViewController *vc = _topViewController;
 			BOOL panEnabled;
 			while ([vc isKindOfClass:[UINavigationController class]]) {
@@ -682,19 +691,21 @@ static char kRSMenuController;
 				return panEnabled;
 		}
 		return YES;
-	} else if (gestureRecognizer == _swipe) {
-		CGPoint loc = [_swipe locationInView:self.view];
-		if (CGRectContainsPoint(_activeFrame, loc)) {
-			return YES;
-		}
-		return NO;
+	}
+	if (gestureRecognizer == _swipe) {
+		return inActiveFrame;
 	}
 	return YES;
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
 {
-	return gestureRecognizer == _tap || gestureRecognizer == _pan;
+	if (gestureRecognizer == _pan) {
+		if ([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"])
+			[otherGestureRecognizer requireGestureRecognizerToFail:gestureRecognizer];
+		return YES;
+	}
+	return NO;
 }
 
 #pragma mark - UINavigationControllerDelegate

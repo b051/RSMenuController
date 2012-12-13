@@ -14,6 +14,7 @@
 {
     if ((self = [super initWithTarget:target action:action])) {
 		self.maximumNumberOfTouches = 1;
+		self.directions = UISwipeGestureRecognizerDirectionLeft | UISwipeGestureRecognizerDirectionRight;
     }
     return self;
 }
@@ -32,12 +33,14 @@
 {
 	[super touchesMoved:touches withEvent:event];
 	if (self.state == UIGestureRecognizerStateFailed) return;
-	if (self.state == UIGestureRecognizerStateBegan) {
-		CGPoint curr = [[touches anyObject] locationInView:self.view];
-		CGPoint prev = [[touches anyObject] previousLocationInView:self.view];
-		CGFloat horizontalWin = ABS(curr.x - prev.x) - ABS(curr.y - prev.y);
-		if (horizontalWin < 0) {
-			self.state = UIGestureRecognizerStateFailed;
+	if (_directions) {
+		if (self.state == UIGestureRecognizerStateBegan) {
+			CGPoint curr = [[touches anyObject] locationInView:self.view];
+			CGPoint prev = [[touches anyObject] previousLocationInView:self.view];
+			CGFloat horizontalWin = ABS(curr.x - prev.x) - ABS(curr.y - prev.y);
+			if (horizontalWin < 0) {
+				self.state = UIGestureRecognizerStateFailed;
+			}
 		}
 	}
 }
