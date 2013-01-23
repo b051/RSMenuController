@@ -290,7 +290,7 @@ static char kRSMenuController;
 	_topViewController = controller;
 	_topViewController.view.userInteractionEnabled = YES;
 	_topViewController.menuController = self;
-	RMLog(@"new top %@", _top);
+	RMLog(@"new top %@", _topViewController);
 	if (_topViewController == _rootViewController) {
 		_topIndex = 0;
 		
@@ -614,7 +614,7 @@ static char kRSMenuController;
 			[_topViewController.view endEditing:NO];
 		}
 		[_panning.view RS_showShadow:_foldedShadowRadius];
-		RMLog(@"_top%s = %@ _currentFold = %@", _panning == _top ? "(panning)" : "", _top,  _currentFold);
+		RMLog(@"_top%s = %@ _currentFold = %@", _panning == _topViewController ? "(panning)" : "", _topViewController,  _currentFold);
 		_panOriginX = _panning.view.frame.origin.x;
 	} else if (gesture.state == UIGestureRecognizerStateChanged) {
 		CGPoint translation = [gesture translationInView:self.view];
