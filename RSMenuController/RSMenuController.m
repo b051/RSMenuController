@@ -278,10 +278,24 @@ static char kRSMenuController;
 		RMLog(@"setTop in showViewController:animated:");
 		[self setTopViewController:controller];
 		[self moveViewControllersAccordingToTopIndexAnimated:animated except:_topViewController];
-		[self moveViewController:_topViewController toX:0 animated:animated completion:^(BOOL finished) {
-			[self reloadViewControllersIfNecessary:YES];
-		}];
+		[self showRootViewController:animated];
 	}
+}
+
+- (void)hideRootViewController:(BOOL)animated
+{
+	CGFloat width = self.view.bounds.size.width;
+	[self moveViewController:_rootViewController toX:width animated:animated completion:^(BOOL finished) {
+		[self reloadViewControllersIfNecessary:YES];
+	}];
+}
+
+- (void)showRootViewController:(BOOL)animated
+{
+	CGFloat width = self.view.bounds.size.width;
+	[self moveViewController:_rootViewController toX:width - self.margin animated:animated completion:^(BOOL finished) {
+		[self reloadViewControllersIfNecessary:YES];
+	}];
 }
 
 - (void)setTopViewController:(UIViewController *)controller

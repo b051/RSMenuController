@@ -48,6 +48,9 @@ typedef enum {
 - (UIViewController *)oneViewControllerRight;
 
 - (void)setRootViewControllers:(NSArray *)rootViewControllers animated:(BOOL)animated;
+- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated;
+- (void)showRootViewController:(BOOL)animated;
+- (void)hideRootViewController:(BOOL)animated;
 
 @property (nonatomic, copy) NSArray *rootViewControllers;
 @property (nonatomic, copy) NSArray *leftViewControllers;
