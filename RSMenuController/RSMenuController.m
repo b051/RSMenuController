@@ -278,7 +278,9 @@ static char kRSMenuController;
 		RMLog(@"setTop in showViewController:animated:");
 		[self setTopViewController:controller];
 		[self moveViewControllersAccordingToTopIndexAnimated:animated except:_topViewController];
-		[self showRootViewController:animated];
+		[self moveViewController:_topViewController toX:0 animated:animated completion:^(BOOL finished) {
+			[self reloadViewControllersIfNecessary:YES];
+		}];
 	}
 }
 
