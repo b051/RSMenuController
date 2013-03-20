@@ -633,6 +633,7 @@ static char kRSMenuController;
 		RMLog(@"_top%s = %@ _currentFold = %@", _panning == _topViewController ? "(panning)" : "", _topViewController,  _currentFold);
 		_panOriginX = _panning.view.frame.origin.x;
 	} else if (gesture.state == UIGestureRecognizerStateChanged) {
+		if (![self panEnabled]) return;
 		CGPoint translation = [gesture translationInView:self.view];
 		CGRect frame = _panning.view.frame;
 		[gesture setTranslation:CGPointZero inView:self.view];
@@ -688,37 +689,43 @@ static char kRSMenuController;
 	return YES;
 }
 
+- (BOOL)panEnabled
+{
+	UIViewController *vc = _topViewController;
+	BOOL panEnabled = YES;
+	while ([vc isKindOfClass:[UINavigationController class]]) {
+		if ([vc RS_panEnabled:&panEnabled])
+			return panEnabled;
+		vc = [(UINavigationController *)vc topViewController];
+	}
+	[vc RS_panEnabled:&panEnabled];
+	return panEnabled;
+}
+
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch
 {
 	BOOL inActiveFrame = CGRectContainsPoint(_activeFrame, [touch locationInView:self.view]);
 	if (gestureRecognizer == _tap) {
 		return !inActiveFrame;
 	}
-	if (gestureRecognizer == _pan) {
-		if (inActiveFrame) {
-			UIViewController *vc = _topViewController;
-			BOOL panEnabled;
-			while ([vc isKindOfClass:[UINavigationController class]]) {
-				if ([vc RS_panEnabled:&panEnabled])
-					return panEnabled;
-				vc = [(UINavigationController *)vc topViewController];
-			}
-			if ([vc RS_panEnabled:&panEnabled])
-				return panEnabled;
-		}
-		return YES;
-	}
-	if (gestureRecognizer == _swipe) {
-		return inActiveFrame;
-	}
+//	if (gestureRecognizer == _pan) {
+//		if (inActiveFrame) {
+//			return [self panEnabled];
+//		}
+//		return YES;
+//	}
+//	if (gestureRecognizer == _swipe) {
+//		return !inActiveFrame;
+//	}
 	return YES;
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
 {
 	if (gestureRecognizer == _pan) {
-		if ([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"])
+		if ([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"]) {
 			[otherGestureRecognizer requireGestureRecognizerToFail:gestureRecognizer];
+		}
 		return YES;
 	}
 	return NO;
