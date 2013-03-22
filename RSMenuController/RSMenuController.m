@@ -189,6 +189,7 @@ static char kRSMenuController;
 	_pan = pan;
 	_pan.delegate = self;
 	[self.view addGestureRecognizer:_pan];
+	
 	[_pan requireGestureRecognizerToFail:_swipe];
 	[_tap requireGestureRecognizerToFail:_pan];
 }
@@ -405,11 +406,9 @@ static char kRSMenuController;
 	showingLeftView = dir == RSMenuPanDirectionLeft;
 	if (dir == RSMenuPanDirectionLeft) {
 		for (UIViewController *vc in _rightViewControllers) [vc RS_hide];
-		//		[self _toggleViewControllersFromCurrentPosition:self.leftViewControllers];
 		for (UIViewController *vc in _leftViewControllers) [vc RS_show];
 	} else if (dir == RSMenuPanDirectionRight) {
 		for (UIViewController *vc in _leftViewControllers) [vc RS_hide];
-		//		[self _toggleViewControllersFromCurrentPosition:self.rightViewControllers];
 		for (UIViewController *vc in _rightViewControllers) [vc RS_show];
 	} else {
 		for (UIViewController *vc in _leftViewControllers) [vc RS_hide];
@@ -609,7 +608,6 @@ static char kRSMenuController;
 
 - (void)swipe:(RSSwipeGestureRecognizer *)gesture
 {
-	//	RMLog(@"swipe %d", gesture.state);
 	if (gesture.state == UIGestureRecognizerStateRecognized) {
 		if (_topIndex < 0) {
 			[self showViewController:[self oneViewControllerRight] animated:YES];
@@ -633,7 +631,7 @@ static char kRSMenuController;
 		RMLog(@"_top%s = %@ _currentFold = %@", _panning == _topViewController ? "(panning)" : "", _topViewController,  _currentFold);
 		_panOriginX = _panning.view.frame.origin.x;
 	} else if (gesture.state == UIGestureRecognizerStateChanged) {
-		if (![self panEnabled]) return;
+		if (![self panEnabledOnPanningViewController]) return;
 		CGPoint translation = [gesture translationInView:self.view];
 		CGRect frame = _panning.view.frame;
 		[gesture setTranslation:CGPointZero inView:self.view];
@@ -689,9 +687,9 @@ static char kRSMenuController;
 	return YES;
 }
 
-- (BOOL)panEnabled
+- (BOOL)panEnabledOnPanningViewController
 {
-	UIViewController *vc = _topViewController;
+	UIViewController *vc = _panning;
 	BOOL panEnabled = YES;
 	while ([vc isKindOfClass:[UINavigationController class]]) {
 		if ([vc RS_panEnabled:&panEnabled])
@@ -704,32 +702,28 @@ static char kRSMenuController;
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch
 {
+	if (gestureRecognizer == _pan) return YES;
 	BOOL inActiveFrame = CGRectContainsPoint(_activeFrame, [touch locationInView:self.view]);
-	if (gestureRecognizer == _tap) {
-		return !inActiveFrame;
-	}
+	return (gestureRecognizer == _tap) ^ inActiveFrame;
+//	if (gestureRecognizer == _tap) {
+//		return !inActiveFrame;
+//	}
+//	if (gestureRecognizer == _swipe) {
+//		return inActiveFrame;
+//	}
+//	return YES;
+}
+
+//- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
+//{
 //	if (gestureRecognizer == _pan) {
-//		if (inActiveFrame) {
-//			return [self panEnabled];
+//		if ([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"]) {
+//			[otherGestureRecognizer requireGestureRecognizerToFail:gestureRecognizer];
 //		}
 //		return YES;
 //	}
-//	if (gestureRecognizer == _swipe) {
-//		return !inActiveFrame;
-//	}
-	return YES;
-}
-
-- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
-{
-	if (gestureRecognizer == _pan) {
-		if ([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"]) {
-			[otherGestureRecognizer requireGestureRecognizerToFail:gestureRecognizer];
-		}
-		return YES;
-	}
-	return NO;
-}
+//	return NO;
+//}
 
 #pragma mark - UINavigationControllerDelegate
 - (void)navigationController:(UINavigationController *)navigationController didShowViewController:(UIViewController *)viewController animated:(BOOL)animated
