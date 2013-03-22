@@ -707,6 +707,17 @@ static char kRSMenuController;
 	return (gestureRecognizer == _tap) ^ inActiveFrame;
 }
 
+- (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
+{
+	if (gestureRecognizer == _pan) {
+		if ([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"]) {
+			[otherGestureRecognizer requireGestureRecognizerToFail:gestureRecognizer];
+		}
+		return YES;
+	}
+	return NO;
+}
+
 #pragma mark - UINavigationControllerDelegate
 - (void)navigationController:(UINavigationController *)navigationController didShowViewController:(UIViewController *)viewController animated:(BOOL)animated
 {
