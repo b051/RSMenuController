@@ -379,7 +379,7 @@ static char kRSMenuController;
 
 - (void)showRootController
 {
-    [self showViewController:_rootViewController animated:NO];
+	[self showViewController:_rootViewController animated:NO];
 }
 
 - (void)_toggleViewControllersFromCurrentPosition:(NSArray *)array
