@@ -631,7 +631,11 @@ static char kRSMenuController;
 		RMLog(@"_top%s = %@ _currentFold = %@", _panning == _topViewController ? "(panning)" : "", _topViewController,  _currentFold);
 		_panOriginX = _panning.view.frame.origin.x;
 	} else if (gesture.state == UIGestureRecognizerStateChanged) {
-		if (![self panEnabledOnPanningViewController]) return;
+		if (![self panEnabledOnPanningViewController]) {
+//			gesture.state = UIGestureRecognizerStateFailed;
+			RMLog(@"pan disabled on controller %@", _panning);
+			return;
+		}
 		CGPoint translation = [gesture translationInView:self.view];
 		CGRect frame = _panning.view.frame;
 		[gesture setTranslation:CGPointZero inView:self.view];
@@ -689,7 +693,11 @@ static char kRSMenuController;
 
 - (BOOL)panEnabledOnPanningViewController
 {
-	UIViewController *vc = _panning;
+	return [self panEnabledOnViewController:_panning];
+}
+
+- (BOOL)panEnabledOnViewController:(UIViewController *)vc
+{
 	BOOL panEnabled = YES;
 	while ([vc isKindOfClass:[UINavigationController class]]) {
 		if ([vc RS_panEnabled:&panEnabled])
@@ -702,7 +710,14 @@ static char kRSMenuController;
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch
 {
-	if (gestureRecognizer == _pan) return YES;
+	if (gestureRecognizer == _pan) {
+		CGPoint loc = [touch locationInView:self.view];
+		if (CGRectContainsPoint(_currentFold.view.frame, loc)) {
+			return [self panEnabledOnViewController:_currentFold];
+		} else {
+			return [self panEnabledOnViewController:_topViewController];
+		}
+	}
 	BOOL inActiveFrame = CGRectContainsPoint(_activeFrame, [touch locationInView:self.view]);
 	return (gestureRecognizer == _tap) ^ inActiveFrame;
 }
@@ -711,7 +726,11 @@ static char kRSMenuController;
 {
 	if (gestureRecognizer == _pan) {
 		if ([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"]) {
-			[otherGestureRecognizer requireGestureRecognizerToFail:gestureRecognizer];
+			if ([otherGestureRecognizer.view isDescendantOfView:_rootViewController.view]) {
+				[otherGestureRecognizer requireGestureRecognizerToFail:gestureRecognizer];
+			} else {
+				return NO;
+			}
 		}
 		return YES;
 	}
