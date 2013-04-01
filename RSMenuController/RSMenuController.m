@@ -294,9 +294,15 @@ static char kRSMenuController;
 
 - (void)showRootViewController:(BOOL)animated
 {
+	[self showRootViewController:animated completion:nil];
+}
+
+- (void)showRootViewController:(BOOL)animated completion:(dispatch_block_t)completion
+{
 	CGFloat width = self.view.bounds.size.width;
 	[self moveViewController:_rootViewController toX:width - self.margin animated:animated completion:^(BOOL finished) {
 		[self reloadViewControllersIfNecessary:YES];
+		if (completion) completion();
 	}];
 }
 

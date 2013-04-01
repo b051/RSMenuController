@@ -50,6 +50,7 @@ typedef enum {
 - (void)setRootViewControllers:(NSArray *)rootViewControllers animated:(BOOL)animated;
 - (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated;
 - (void)showRootViewController:(BOOL)animated;
+- (void)showRootViewController:(BOOL)animated completion:(dispatch_block_t)completion;
 - (void)hideRootViewController:(BOOL)animated;
 
 @property (nonatomic, copy) NSArray *rootViewControllers;
