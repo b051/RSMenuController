@@ -93,7 +93,6 @@ static char kRSMenuController;
 @property (nonatomic, weak) UIViewController *currentFold;
 @property (nonatomic, weak) UIViewController *panning;
 
-@property (nonatomic) CGFloat margin;
 @property (nonatomic) CGFloat panOriginX;
 @property (nonatomic) CGRect activeFrame;
 @property (nonatomic) NSInteger topIndex;

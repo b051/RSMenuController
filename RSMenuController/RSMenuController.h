@@ -57,13 +57,14 @@ typedef enum {
 @property (nonatomic, copy) NSArray *rightViewControllers;
 
 @property (nonatomic, readonly) UIViewController *topViewController;
-@property (nonatomic, readonly) UINavigationController *rootViewController;
+@property (nonatomic, strong) UINavigationController *rootViewController;
 
 @property (nonatomic, assign) CGFloat resistanceForce;
 @property (nonatomic, assign) CGFloat swipeDuration;
 @property (nonatomic, assign) CGFloat foldedShadowRadius;
 @property (nonatomic, assign) CGFloat bounceDuration;
 @property (nonatomic, assign) BOOL keepSpeed;
+@property (nonatomic) CGFloat margin;
 
 @end
 
