@@ -69,10 +69,14 @@ static char kRSMenuController;
 	}
 }
 
-- (BOOL)RS_panEnabled:(BOOL *)panEnabled
+- (BOOL)RS_panEnabled:(BOOL *)panEnabled touch:(UITouch *)touch
 {
 	if (self.presentedViewController) {
 		*panEnabled = NO;
+		return YES;
+	}
+	if ([self respondsToSelector:@selector(panEnabledOnTouch:)]) {
+		*panEnabled = [(id<RSMenuPanEnabledProtocol>)self panEnabledOnTouch:touch];
 		return YES;
 	}
 	if ([self respondsToSelector:@selector(panEnabled)]) {
@@ -698,18 +702,18 @@ static char kRSMenuController;
 
 - (BOOL)panEnabledOnPanningViewController
 {
-	return [self panEnabledOnViewController:_panning];
+	return [self panEnabledOnViewController:_panning touch:nil];
 }
 
-- (BOOL)panEnabledOnViewController:(UIViewController *)vc
+- (BOOL)panEnabledOnViewController:(UIViewController *)vc touch:(UITouch *)touch
 {
 	BOOL panEnabled = YES;
 	while ([vc isKindOfClass:[UINavigationController class]]) {
-		if ([vc RS_panEnabled:&panEnabled])
+		if ([vc RS_panEnabled:&panEnabled touch:touch])
 			return panEnabled;
 		vc = [(UINavigationController *)vc topViewController];
 	}
-	[vc RS_panEnabled:&panEnabled];
+	[vc RS_panEnabled:&panEnabled touch:touch];
 	return panEnabled;
 }
 
@@ -718,9 +722,9 @@ static char kRSMenuController;
 	if (gestureRecognizer == _pan) {
 		CGPoint loc = [touch locationInView:self.view];
 		if (CGRectContainsPoint(_currentFold.view.frame, loc)) {
-			return [self panEnabledOnViewController:_currentFold];
+			return [self panEnabledOnViewController:_currentFold touch:touch];
 		} else {
-			return [self panEnabledOnViewController:_topViewController];
+			return [self panEnabledOnViewController:_topViewController touch:touch];
 		}
 	}
 	BOOL inActiveFrame = CGRectContainsPoint(_activeFrame, [touch locationInView:self.view]);

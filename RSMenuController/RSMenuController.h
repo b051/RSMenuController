@@ -36,7 +36,9 @@ typedef enum {
 
 @protocol RSMenuPanEnabledProtocol <NSObject>
 
+@optional
 - (BOOL)panEnabled;
+- (BOOL)panEnabledOnTouch:(UITouch *)touch;
 
 @end
 
