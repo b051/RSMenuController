@@ -46,14 +46,17 @@ typedef enum {
 
 - (id)initWithRootViewController:(UINavigationController *)controller margin:(CGFloat)margin;
 - (void)showViewController:(UIViewController *)controller animated:(BOOL)animated;
+- (void)showViewController:(UIViewController *)controller animated:(BOOL)animated completion:(dispatch_block_t)block;
 - (UIViewController *)oneViewControllerLeft;
 - (UIViewController *)oneViewControllerRight;
 
 - (void)setRootViewControllers:(NSArray *)rootViewControllers animated:(BOOL)animated;
 - (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated;
+- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated completion:(void (^)(BOOL))block;
 - (void)showRootViewController:(BOOL)animated;
 - (void)showRootViewController:(BOOL)animated completion:(dispatch_block_t)completion;
 - (void)hideRootViewController:(BOOL)animated;
+- (void)hideRootViewController:(BOOL)animated completion:(dispatch_block_t)completion;
 
 @property (nonatomic, copy) NSArray *rootViewControllers;
 @property (nonatomic, copy) NSArray *leftViewControllers;

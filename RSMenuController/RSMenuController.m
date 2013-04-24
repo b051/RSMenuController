@@ -218,7 +218,7 @@ static char kRSMenuController;
 	}
 }
 
-- (void)moveViewControllersAccordingToTopIndexAnimated:(BOOL)animated except:(UIViewController *)except
+- (void)moveViewControllersAccordingToTopIndexAnimated:(BOOL)animated except:(UIViewController *)except completion:(void(^)(BOOL))completion
 {
 	CGFloat width = self.view.bounds.size.width;
 	if (_topIndex > 0) {
@@ -226,7 +226,7 @@ static char kRSMenuController;
 		for (int i = 0; i < MAX(0, _topIndex - 2); i++) {
 			UIViewController *viewController = [self viewControllerAtIndex:i];
 			if (viewController != except) {
-				[self moveViewController:viewController toX:-width animated:animated];
+				[self moveViewController:viewController toX:-width animated:animated completion:completion];
 			}
 		}
 		UIViewController *viewController = [self viewControllerAtIndex:_topIndex - 1];
@@ -236,13 +236,13 @@ static char kRSMenuController;
 		if (_topIndex - 2 >= 0) {
 			UIViewController *viewController = [self viewControllerAtIndex:_topIndex - 2];
 			if (viewController != except) {
-				[self moveViewController:viewController toX:_margin / 3 - width animated:animated];
+				[self moveViewController:viewController toX:_margin / 3 - width animated:animated completion:completion];
 			}
 		}
 		for (int i = _topIndex + 1; i < self.leftViewControllers.count + 1; i++) {
 			UIViewController *viewController = [self viewControllerAtIndex:i];
 			if (viewController != except) {
-				[self moveViewController:viewController toX:0 animated:NO];
+				[self moveViewController:viewController toX:0 animated:NO completion:completion];
 			}
 		}
 	} else if (_topIndex < 0) {
@@ -250,49 +250,62 @@ static char kRSMenuController;
 		for (int i = 0; i < MIN(0, -_topIndex - 2); i++) {
 			UIViewController *viewController = [self viewControllerAtIndex:-i];
 			if (viewController != except) {
-				[self moveViewController:viewController toX:width animated:animated];
+				[self moveViewController:viewController toX:width animated:animated completion:completion];
 			}
 		}
 		UIViewController *viewController = [self viewControllerAtIndex:_topIndex + 1];
 		if (viewController != except) {
-			[self moveViewController:viewController toX:width - _margin animated:animated];
+			[self moveViewController:viewController toX:width - _margin animated:animated completion:completion];
 		}
 		if (_topIndex + 2 <= 0) {
 			UIViewController *viewController = [self viewControllerAtIndex:_topIndex + 2];
 			if (viewController != except) {
-				[self moveViewController:viewController toX:width - _margin / 3 animated:animated];
+				[self moveViewController:viewController toX:width - _margin / 3 animated:animated completion:completion];
 			}
 		}
 		for (int i = _topIndex - 1; i > -self.leftViewControllers.count - 1; i--) {
 			UIViewController *viewController = [self viewControllerAtIndex:i];
 			if (viewController != except) {
-				[self moveViewController:viewController toX:0 animated:NO];
+				[self moveViewController:viewController toX:0 animated:NO completion:completion];
 			}
 		}
 	} else {
 		if (_rootViewController != except) {
-			[self moveViewController:_rootViewController toX:0 animated:animated];
+			[self moveViewController:_rootViewController toX:0 animated:animated completion:completion];
 		}
 	}
 }
 
-- (void)showViewController:(UIViewController *)controller animated:(BOOL)animated
+- (void)showViewController:(UIViewController *)controller animated:(BOOL)animated completion:(dispatch_block_t)block
 {
 	if (_topViewController != controller) {
 		RMLog(@"setTop in showViewController:animated:");
 		[self setTopViewController:controller];
-		[self moveViewControllersAccordingToTopIndexAnimated:animated except:_topViewController];
+		[self moveViewControllersAccordingToTopIndexAnimated:animated except:_topViewController completion:^(BOOL success) {
+			if (block) block();
+		}];
 		[self moveViewController:_topViewController toX:0 animated:animated completion:^(BOOL finished) {
 			[self reloadViewControllersIfNecessary:YES];
 		}];
 	}
 }
 
+- (void)showViewController:(UIViewController *)controller animated:(BOOL)animated
+{
+	[self showViewController:controller animated:animated completion:nil];
+}
+
 - (void)hideRootViewController:(BOOL)animated
+{
+	[self hideRootViewController:animated completion:nil];
+}
+
+- (void)hideRootViewController:(BOOL)animated completion:(dispatch_block_t)completion
 {
 	CGFloat width = self.view.bounds.size.width;
 	[self moveViewController:_rootViewController toX:width animated:animated completion:^(BOOL finished) {
 		[self reloadViewControllersIfNecessary:YES];
+		if (completion) completion();
 	}];
 }
 
@@ -574,7 +587,7 @@ static char kRSMenuController;
 	}
 	
 	if (_panning != _rootViewController) {
-		[self moveViewControllersAccordingToTopIndexAnimated:YES except:_panning];
+		[self moveViewControllersAccordingToTopIndexAnimated:YES except:_panning completion:nil];
 	}
 	
 	CGFloat span = ABS(finalX - destX);
