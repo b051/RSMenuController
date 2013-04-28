@@ -168,7 +168,8 @@ static char kRSMenuController;
 	if (animated) {
 		_originalNavigationControllerDelegate = _rootViewController.delegate;
 		_rootViewController.delegate = self;
-		[self moveViewController:_currentFold toX:self.view.bounds.size.width animated:YES completion:^(BOOL success) {
+		CGFloat width = _currentFold.view.bounds.size.width;
+		[self moveViewController:_currentFold toX:_topIndex > 0 ? -width : width animated:YES completion:^(BOOL success) {
 			if ([_rootViewController.viewControllers isEqualToArray:rootViewControllers]) {
 				[self navigationController:_rootViewController didShowViewController:nil animated:YES];
 			} else
@@ -537,30 +538,39 @@ static char kRSMenuController;
 {
 	self.view.userInteractionEnabled = NO;
 	velocity = velocity * _swipeDuration;
-	
-	CGFloat finalX = controller.view.frame.origin.x;
-	if (_panOriginX > 0) finalX = MAX(0, finalX);
-	if (_panOriginX < 0) finalX = MIN(0, finalX);
-	RMLog(@"finalX = %f", finalX);
-	
 	CGFloat width = controller.view.frame.size.width;
-	CGFloat destX = finalX + velocity;
-	
+	CGFloat finalX = controller.view.frame.origin.x;
 	BOOL toRight = finalX >= _panOriginX;
+	CGFloat destX = finalX + velocity;
+
+	if (_panOriginX < 0) destX = MIN(destX, 0);
+	if (_panOriginX > 0) destX = MAX(destX, 0);
+	
 	BOOL ignore = [self panningLockedOnController:controller direction:toRight ? RSMenuPanDirectionRight : RSMenuPanDirectionLeft];
-	if (ignore) destX = _panOriginX;
-	__block CGFloat minDiff = CGFLOAT_MAX;
-	__block	CGFloat _destX = 0;
-	[stops enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
-		CGFloat x = [obj floatValue];
-		if (x < 0) x += width;
-		CGFloat diff = ABS(x - destX);
-		if (minDiff > diff) {
-			minDiff = diff;
-			_destX = x;
-		}
-	}];
-	destX = _destX;
+	if (ignore) {
+		destX = _panOriginX;
+	} else {
+		__block CGFloat minDiff = CGFLOAT_MAX;
+		__block	CGFloat _destX = 0;
+		[stops enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+			CGFloat x = [obj floatValue];
+			if (x < 0) {
+				if (toRight && self.leftViewControllers) {
+					x = x + width;
+				} else if (!toRight && self.rightViewControllers) {
+					x = -(x + width);
+				} else {
+					return;
+				}
+			}
+			CGFloat diff = ABS(x - destX);
+			if (minDiff > diff) {
+				minDiff = diff;
+				_destX = x;
+			}
+		}];
+		destX = _destX;
+	}
 	if (controller == _currentFold) {
 		RMLog(@"setTop in finishAnimation:");
 		[self setTopViewController:_currentFold];
