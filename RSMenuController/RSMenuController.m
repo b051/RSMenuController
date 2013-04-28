@@ -694,14 +694,6 @@ static char kRSMenuController;
 }
 
 #pragma mark - UIGestureRecognizerDelegate
-- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
-{
-	if (gestureRecognizer == _tap) {
-		return _currentFold && _currentFold.view.frame.origin.x == _currentFold.view.bounds.size.width - _margin;
-	}
-	return YES;
-}
-
 - (BOOL)panEnabledOnPanningViewController
 {
 	return [self panEnabledOnViewController:_panning touch:nil];

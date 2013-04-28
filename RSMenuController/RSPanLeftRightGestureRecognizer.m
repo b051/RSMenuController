@@ -28,7 +28,6 @@
 {
 	[super touchesBegan:touches withEvent:event];
 	_startPoint = [[touches anyObject] locationInView:self.view];
-//	NSLog(@"b state %d", self.state);
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event
@@ -44,21 +43,18 @@
 			self.state = UIGestureRecognizerStateBegan;
 		}
 	}
-//	NSLog(@"m state %d", self.state);
 }
 
 - (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event
 {
 	[super touchesEnded:touches withEvent:event];
 	self.state = UIGestureRecognizerStateEnded;
-//	NSLog(@"e state %d", self.state);
 }
 
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event
 {
 	[super touchesCancelled:touches withEvent:event];
 	self.state = UIGestureRecognizerStateCancelled;
-//	NSLog(@"c state %d", self.state);
 }
 
 @end
