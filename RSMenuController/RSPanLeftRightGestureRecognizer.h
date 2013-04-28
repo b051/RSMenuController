@@ -8,7 +8,6 @@
 
 #import <UIKit/UIGestureRecognizerSubclass.h>
 
-
 @interface RSPanLeftRightGestureRecognizer : UIPanGestureRecognizer
 
 - (void)reset;
@@ -18,5 +17,6 @@
 - (void)touchesCancelled:(NSSet *)touches withEvent:(UIEvent *)event;
 
 @property (nonatomic) NSUInteger directions;
+@property (nonatomic) CGPoint startPoint;
 
 @end

@@ -28,11 +28,11 @@ extern int ddLogLevel;
 #define RMLog(...) ((void)0)
 #endif
 
-typedef enum {
+typedef NS_ENUM(NSUInteger, RSMenuPanDirection) {
 	RSMenuPanDirectionLeft = 0,
 	RSMenuPanDirectionRight,
 	RSMenuPanDirectionNone
-} RSMenuPanDirection;
+};
 
 @protocol RSMenuPanEnabledProtocol <NSObject>
 
@@ -53,10 +53,14 @@ typedef enum {
 - (void)setRootViewControllers:(NSArray *)rootViewControllers animated:(BOOL)animated;
 - (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated;
 - (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated completion:(void (^)(BOOL))block;
+
+//use these methods only when menu
 - (void)showRootViewController:(BOOL)animated;
 - (void)showRootViewController:(BOOL)animated completion:(dispatch_block_t)completion;
 - (void)hideRootViewController:(BOOL)animated;
 - (void)hideRootViewController:(BOOL)animated completion:(dispatch_block_t)completion;
+
+- (void)addRootViewControllerAnimationStop:(CGFloat)stop;
 
 @property (nonatomic, copy) NSArray *rootViewControllers;
 @property (nonatomic, copy) NSArray *leftViewControllers;
@@ -71,6 +75,10 @@ typedef enum {
 @property (nonatomic, assign) CGFloat bounceDuration;
 @property (nonatomic, assign) BOOL keepSpeed;
 @property (nonatomic) CGFloat margin;
+
+@property (nonatomic, readonly, weak) UIGestureRecognizer *swipe;
+@property (nonatomic, readonly, weak) UIPanGestureRecognizer *pan;
+@property (nonatomic, readonly, weak) UITapGestureRecognizer *tap;
 
 @end
 
