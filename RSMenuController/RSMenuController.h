@@ -28,10 +28,10 @@ extern int ddLogLevel;
 #define RMLog(...) ((void)0)
 #endif
 
-typedef NS_ENUM(NSUInteger, RSMenuPanDirection) {
-	RSMenuPanDirectionLeft = 0,
-	RSMenuPanDirectionRight,
-	RSMenuPanDirectionNone
+typedef NS_ENUM(NSInteger, RSMenuPanDirection) {
+	RSMenuPanDirectionLeft = 1,
+	RSMenuPanDirectionRight = -1,
+	RSMenuPanDirectionNone = 0
 };
 
 @protocol RSMenuPanEnabledProtocol <NSObject>
