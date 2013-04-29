@@ -128,16 +128,17 @@ static char kRSMenuController;
 - (void)setMargin:(CGFloat)margin
 {
 	_margin = margin;
-	if (!stops) {
-		stops = @[@0, @(-margin)];
-	}
+	[self addRootViewControllerAnimationStop:-margin];
 }
 
 - (void)addRootViewControllerAnimationStop:(CGFloat)stop
 {
-	NSMutableArray *_stops = [stops mutableCopy];
-	[_stops addObject:@(stop)];
-	stops = _stops;
+	if (!stops) stops = @[@0, @(stop)];
+	else {
+		NSMutableArray *_stops = [stops mutableCopy];
+		[_stops addObject:@(stop)];
+		stops = _stops;
+	}
 }
 
 - (void)setLeftViewControllers:(NSArray *)leftViewControllers
@@ -216,20 +217,19 @@ static char kRSMenuController;
 - (UIViewController *)viewControllerAtIndex:(NSInteger)index
 {
 	if (index == 0) return _rootViewController;
-	else if (index > 0) {
+	if (index > 0) {
 		index--;
 		if (self.rightViewControllers.count > index) {
-			return (self.rightViewControllers)[index];
+			return self.rightViewControllers[index];
 		} else {
 			return nil;
 		}
+	}
+	index = -index - 1;
+	if (self.leftViewControllers.count > index) {
+		return self.leftViewControllers[index];
 	} else {
-		index = -index - 1;
-		if (self.leftViewControllers.count > index) {
-			return (self.leftViewControllers)[index];
-		} else {
-			return nil;
-		}
+		return nil;
 	}
 }
 
@@ -518,72 +518,26 @@ static char kRSMenuController;
 {
 	if (dir == RSMenuPanDirectionRight) {
 		if (showingLeftView) {
-			if (reachLeftEnd) return YES;
-			if (controller == _currentFold) {
-				return YES;
-			}
+			if (reachLeftEnd || controller == _currentFold) return YES;
 		}
-	} else {
-		if (showingRightView) {
-			if (reachRightEnd) return YES;
-			if (controller == _currentFold) {
-				return YES;
-			}
-		}
+		return NO;
 	}
-	return NO;
+	if (dir == RSMenuPanDirectionLeft) {
+		if (showingRightView) {
+			if (reachRightEnd || controller == _currentFold) return YES;
+		}
+		return NO;
+	}
+	return YES;
 }
 
-- (void)finishAnimationOnViewController:(UIViewController *)controller velocity:(CGFloat)velocity
+- (void)endAnimationOnViewController:(UIViewController *)controller destX:(CGFloat)destX
 {
-	self.view.userInteractionEnabled = NO;
-	velocity = velocity * _swipeDuration;
-	CGFloat width = controller.view.frame.size.width;
-	CGFloat finalX = controller.view.frame.origin.x;
-	BOOL toRight = finalX >= _panOriginX;
-	CGFloat destX = finalX + velocity;
-
-	if (_panOriginX < 0) destX = MIN(destX, 0);
-	if (_panOriginX > 0) destX = MAX(destX, 0);
-	
-	BOOL ignore = [self panningLockedOnController:controller direction:toRight ? RSMenuPanDirectionRight : RSMenuPanDirectionLeft];
-	if (ignore) {
-		destX = _panOriginX;
-	} else {
-		__block CGFloat minDiff = CGFLOAT_MAX;
-		__block	CGFloat _destX = 0;
-		[stops enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
-			CGFloat x = [obj floatValue];
-			if (x < 0) {
-				if (toRight && self.leftViewControllers) {
-					x = x + width;
-				} else if (!toRight && self.rightViewControllers) {
-					x = -(x + width);
-				} else {
-					return;
-				}
-			}
-			CGFloat diff = ABS(x - destX);
-			if (minDiff > diff) {
-				minDiff = diff;
-				_destX = x;
-			}
-		}];
-		destX = _destX;
-	}
-	if (controller == _currentFold) {
-		RMLog(@"setTop in finishAnimation:");
-		[self setTopViewController:_currentFold];
-	} else {
-		RMLog(@"setTop in finishAnimation:");
-		[self setTopViewController:[self viewControllerAtIndex:_topIndex + (toRight ? -1 : 1)]];
-	}
-	
-	if (controller != _rootViewController) {
-		[self moveViewControllersAccordingToTopIndexAnimated:YES except:_panning completion:nil];
-	}
-	
-	CGFloat span = ABS(finalX - destX) / width;
+    self.view.userInteractionEnabled = NO;
+	CGRect frame = controller.view.frame;
+	CGFloat x = frame.origin.x;
+	CGFloat width = frame.size.width;
+	CGFloat span = ABS(x - destX) / width;
 	BOOL bounce = _bounceDuration && span > .5;
 	CGFloat duration = _keepSpeed ? MAX(.5f, span) * _swipeDuration : _swipeDuration;
 	CALayer *layer = controller.view.layer;
@@ -613,6 +567,55 @@ static char kRSMenuController;
 	[CATransaction commit];
 }
 
+- (void)endPanningOnViewController:(UIViewController *)controller velocity:(CGFloat)velocity
+{
+	velocity = velocity * _swipeDuration;
+	CGFloat width = controller.view.frame.size.width;
+	CGFloat finalX = controller.view.frame.origin.x;
+	CGFloat destX = finalX + velocity;
+	
+	if (_panOriginX < 0) destX = MIN(destX, 0);
+	if (_panOriginX > 0) destX = MAX(destX, 0);
+	BOOL toRight = destX > _panOriginX;
+	BOOL toLeft = destX < _panOriginX;
+	RSMenuPanDirection direction = toRight ? RSMenuPanDirectionRight : (toLeft ? RSMenuPanDirectionLeft : RSMenuPanDirectionNone);
+	BOOL ignore = [self panningLockedOnController:controller direction:direction];
+	if (ignore) {
+		destX = _panOriginX;
+	} else {
+		__block CGFloat minDiff = CGFLOAT_MAX;
+		__block	CGFloat _destX = 0;
+		void(^pop)(CGFloat x) = ^(CGFloat x) {
+			CGFloat diff = ABS(x - destX);
+			if (minDiff > diff) {
+				minDiff = diff;
+				_destX = x;
+			}
+		};
+		[stops enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+			CGFloat x = [obj floatValue];
+			if (x < 0) {
+				if (self.leftViewControllers) pop(x + width);
+				if (self.rightViewControllers) pop(-(x + width));
+			} else {
+				pop(x);
+			}
+		}];
+		destX = _destX;
+	}
+	if (destX == _panOriginX) {
+		[self setTopViewController:controller];
+	} else {
+		[self setTopViewController:[self viewControllerAtIndex:_topIndex + direction]];
+	}
+	
+	if (controller != _rootViewController) {
+		[self moveViewControllersAccordingToTopIndexAnimated:YES except:controller completion:nil];
+	}
+	
+	[self endAnimationOnViewController:controller destX:destX];
+}
+
 - (void)swipe:(RSSwipeGestureRecognizer *)gesture
 {
 	if (gesture.state == UIGestureRecognizerStateRecognized) {
@@ -626,7 +629,8 @@ static char kRSMenuController;
 
 - (void)pan:(RSPanLeftRightGestureRecognizer *)gesture
 {
-	if (gesture.state == UIGestureRecognizerStateChanged) {
+	if (gesture.state == UIGestureRecognizerStateBegan) {
+	} else if (gesture.state == UIGestureRecognizerStateChanged) {
 		if (!_panning) {
 			CGPoint loc = gesture.startPoint;
 			if (CGRectContainsPoint(_currentFold.view.frame, loc)) {
@@ -643,6 +647,7 @@ static char kRSMenuController;
 			RMLog(@"pan disabled on controller %@", _panning);
 			return;
 		}
+		_panning.view.userInteractionEnabled = NO;
 		CGPoint translation = [gesture translationInView:self.view];
 		CGRect frame = _panning.view.frame;
 		[gesture setTranslation:CGPointZero inView:self.view];
@@ -680,9 +685,10 @@ static char kRSMenuController;
 			CGFloat velocity = [gesture velocityInView:self.view].x;
 			__strong UIViewController *controller = _panning;
 			_panning = nil;
-			[self finishAnimationOnViewController:controller velocity:velocity];
+			[self endPanningOnViewController:controller velocity:velocity];
 		}
 	} else {
+		_topViewController.view.userInteractionEnabled = YES;
 		_panning = nil;
 	}
 }
@@ -728,7 +734,7 @@ static char kRSMenuController;
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
 {
 	if (gestureRecognizer == _pan) {
-		if ([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"]) {
+		if (([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"]) || [otherGestureRecognizer isKindOfClass:[UITapGestureRecognizer class]]) {
 			if ([otherGestureRecognizer.view isDescendantOfView:_rootViewController.view]) {
 				[otherGestureRecognizer requireGestureRecognizerToFail:_pan];
 			} else {
