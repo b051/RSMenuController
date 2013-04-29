@@ -734,14 +734,13 @@ static char kRSMenuController;
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
 {
 	if (gestureRecognizer == _pan) {
-		//		if ([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"]) {
-		if ([otherGestureRecognizer.view isDescendantOfView:_rootViewController.view]) {
-			NSLog(@"%@ required pan failed", otherGestureRecognizer);
-			[otherGestureRecognizer requireGestureRecognizerToFail:_pan];
-		} else {
-			return NO;
+		if (([otherGestureRecognizer isKindOfClass:[UIPanGestureRecognizer class]] && [NSStringFromClass(otherGestureRecognizer.class) hasPrefix:@"UI"]) || [otherGestureRecognizer isKindOfClass:[UITapGestureRecognizer class]]) {
+			if ([otherGestureRecognizer.view isDescendantOfView:_rootViewController.view]) {
+				[otherGestureRecognizer requireGestureRecognizerToFail:_pan];
+			} else {
+				return NO;
+			}
 		}
-		//		}
 		return YES;
 	}
 	return NO;
