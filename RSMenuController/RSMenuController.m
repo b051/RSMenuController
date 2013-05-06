@@ -435,6 +435,7 @@ static char kRSMenuController;
 		}
 	}
 }
+
 #pragma mark - GestureRecognizers
 - (void)toggleViewControllersDirection:(RSMenuPanDirection)dir
 {
@@ -700,6 +701,7 @@ static char kRSMenuController;
 - (void)tap:(UITapGestureRecognizer *)gesture
 {
 	RMLog(@"tap to show currentFold %@", _currentFold);
+	[self notifyPanEnded];
 	[self showViewController:_currentFold animated:YES];
 }
 
@@ -718,12 +720,8 @@ static char kRSMenuController;
 
 - (void)notifyPanEnded
 {
-	UIViewController *vc = _topViewController;
+	UIViewController *vc = [_rootViewController topViewController];
 	if ([vc respondsToSelector:@selector(panEnded)]) [(id<RSMenuPanEnabledProtocol>)vc panEnded];
-	while ([vc isKindOfClass:[UINavigationController class]]) {
-		vc = [(UINavigationController *)vc topViewController];
-		if ([vc respondsToSelector:@selector(panEnded)]) [(id<RSMenuPanEnabledProtocol>)vc panEnded];
-	}
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch
