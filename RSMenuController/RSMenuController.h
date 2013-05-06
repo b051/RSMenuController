@@ -38,6 +38,7 @@ typedef NS_ENUM(NSInteger, RSMenuPanDirection) {
 
 @optional
 - (BOOL)panEnabled;
+- (void)panEnded;
 - (BOOL)panEnabledOnTouch:(UITouch *)touch;
 
 @end

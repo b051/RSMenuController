@@ -494,6 +494,9 @@ static char kRSMenuController;
 		}
 		frame.origin.x = destX;
 	}
+	if (frame.origin.x != 0 && viewController.view.userInteractionEnabled) {
+		viewController.view.userInteractionEnabled = NO;
+	}
 	if (animated) {
 		self.view.userInteractionEnabled = NO;
 		[UIView animateWithDuration:_swipeDuration animations:^{
@@ -643,11 +646,10 @@ static char kRSMenuController;
 			RMLog(@"_top%s = %@ _currentFold = %@", _panning == _topViewController ? "(panning)" : "", _topViewController,  _currentFold);
 			_panOriginX = _panning.view.frame.origin.x;
 		}
-		if (![self panEnabledOnPanningViewController]) {
+		if (![self panEnabledOnViewController:_panning touch:nil]) {
 			RMLog(@"pan disabled on controller %@", _panning);
 			return;
 		}
-		_panning.view.userInteractionEnabled = NO;
 		CGPoint translation = [gesture translationInView:self.view];
 		CGRect frame = _panning.view.frame;
 		[gesture setTranslation:CGPointZero inView:self.view];
@@ -687,8 +689,10 @@ static char kRSMenuController;
 			_panning = nil;
 			[self endPanningOnViewController:controller velocity:velocity];
 		}
+		[self notifyPanEnded];
 	} else {
 		_topViewController.view.userInteractionEnabled = YES;
+		[self notifyPanEnded];
 		_panning = nil;
 	}
 }
@@ -700,11 +704,6 @@ static char kRSMenuController;
 }
 
 #pragma mark - UIGestureRecognizerDelegate
-- (BOOL)panEnabledOnPanningViewController
-{
-	return [self panEnabledOnViewController:_panning touch:nil];
-}
-
 - (BOOL)panEnabledOnViewController:(UIViewController *)vc touch:(UITouch *)touch
 {
 	BOOL panEnabled = YES;
@@ -715,6 +714,16 @@ static char kRSMenuController;
 	}
 	[vc RS_panEnabled:&panEnabled touch:touch];
 	return panEnabled;
+}
+
+- (void)notifyPanEnded
+{
+	UIViewController *vc = _topViewController;
+	if ([vc respondsToSelector:@selector(panEnded)]) [(id<RSMenuPanEnabledProtocol>)vc panEnded];
+	while ([vc isKindOfClass:[UINavigationController class]]) {
+		vc = [(UINavigationController *)vc topViewController];
+		if ([vc respondsToSelector:@selector(panEnded)]) [(id<RSMenuPanEnabledProtocol>)vc panEnded];
+	}
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldReceiveTouch:(UITouch *)touch
