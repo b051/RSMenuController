@@ -246,7 +246,7 @@ static char kRSMenuController;
 		}
 		UIViewController *viewController = [self viewControllerAtIndex:_topIndex - 1];
 		if (viewController != except) {
-			[self moveViewController:viewController toX:_margin - width animated:animated];
+			[self moveViewController:viewController toX:_margin - width animated:animated completion:completion];
 		}
 		if (_topIndex - 2 >= 0) {
 			UIViewController *viewController = [self viewControllerAtIndex:_topIndex - 2];
