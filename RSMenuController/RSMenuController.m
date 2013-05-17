@@ -54,18 +54,20 @@ static char kRSMenuController;
 {
 	if ([self.view superview]) {
 		[self.view removeFromSuperview];
+		[self removeFromParentViewController];
 		RMLog(@"hide vc %@", self);
 	}
 }
 
-- (void)RS_show
+- (void)RS_show:(UIView *)below
 {
 	if (![self.view superview]) {
-		UIView *superview = [self menuController].view;
+		UIView *superview = self.menuController.view;
 		CGRect rect = superview.bounds;
 		self.view.frame = rect;
 		RMLog(@"show vc %@", self);
-		[superview insertSubview:self.view atIndex:0];
+		[superview insertSubview:self.view belowSubview:below];
+		[self.menuController addChildViewController:self];
 	}
 }
 
@@ -193,6 +195,7 @@ static char kRSMenuController;
 	self.view.backgroundColor = [UIColor clearColor];
 	_rootViewController.view.frame = self.view.bounds;
 	[self.view addSubview:_rootViewController.view];
+	[self addChildViewController:_rootViewController];
 	
 	[self showViewController:_rootViewController animated:NO completion:nil];
 	UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tap:)];
@@ -421,17 +424,18 @@ static char kRSMenuController;
 - (void)_toggleViewControllersFromCurrentPosition:(NSArray *)array
 {
 	BOOL start = NO;
+	__weak UIView *view = self.rootViewController.view;
 	for (UIViewController *vc in array) {
 		if (vc != _topViewController) {
 			if (start) {
 				RMLog(@"hide vc %@", vc);
 				[vc RS_hide];
 			} else {
-				[vc RS_show];
+				[vc RS_show:view];
 			}
 		} else {
 			start = YES;
-			[vc RS_show];
+			[vc RS_show:view];
 		}
 	}
 }
@@ -441,12 +445,20 @@ static char kRSMenuController;
 {
 	showingRightView = dir == RSMenuPanDirectionRight;
 	showingLeftView = dir == RSMenuPanDirectionLeft;
+	UIView *view = self.rootViewController.view;
+	
 	if (dir == RSMenuPanDirectionLeft) {
 		for (UIViewController *vc in _rightViewControllers) [vc RS_hide];
-		for (UIViewController *vc in _leftViewControllers) [vc RS_show];
+		for (UIViewController *vc in _leftViewControllers) {
+			[vc RS_show:view];
+			view = vc.view;
+		}
 	} else if (dir == RSMenuPanDirectionRight) {
 		for (UIViewController *vc in _leftViewControllers) [vc RS_hide];
-		for (UIViewController *vc in _rightViewControllers) [vc RS_show];
+		for (UIViewController *vc in _rightViewControllers) {
+			[vc RS_show:view];
+			view = vc.view;
+		}
 	} else {
 		for (UIViewController *vc in _leftViewControllers) [vc RS_hide];
 		for (UIViewController *vc in _rightViewControllers) [vc RS_hide];
