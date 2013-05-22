@@ -487,11 +487,7 @@ static char kRSMenuController;
 	}
 	BOOL offScreen = ABS(destX) >= self.view.bounds.size.width;
 	
-	if (destX == 0 || offScreen) {
-		[viewController.view RS_showShadow:0];
-	} else {
-		[viewController.view RS_showShadow:_foldedShadowRadius];
-	}
+	[viewController.view RS_showShadow:_foldedShadowRadius];
 	
 	CGRect frame = viewController.view.frame;
 	if (viewController == _topViewController && ((destX > 0.0f && reachLeftEnd) || (destX < 0.0f && reachRightEnd))) {
@@ -748,6 +744,11 @@ static char kRSMenuController;
 	}
 	BOOL inActiveFrame = CGRectContainsPoint(_activeFrame, loc);
 	return (gestureRecognizer == _tap) ^ inActiveFrame;
+}
+
+- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+{
+	return YES;
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)otherGestureRecognizer
