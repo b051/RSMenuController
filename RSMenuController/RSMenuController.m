@@ -485,7 +485,6 @@ static char kRSMenuController;
 		if (block) block(NO);
 		return;
 	}
-	BOOL offScreen = ABS(destX) >= self.view.bounds.size.width;
 	
 	[viewController.view RS_showShadow:_foldedShadowRadius];
 	
