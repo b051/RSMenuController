@@ -12,6 +12,7 @@
 {
 	__weak UILabel *_label;
 }
+
 - (void)viewDidLoad
 {
     [super viewDidLoad];
@@ -29,6 +30,11 @@
 {
 	[super viewWillAppear:animated];
 	_label.text = self.title;
+}
+
+- (NSString *)description
+{
+	return [NSString stringWithFormat:@"'%@'", self.title];
 }
 
 @end

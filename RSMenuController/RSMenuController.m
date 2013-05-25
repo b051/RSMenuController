@@ -34,39 +34,42 @@
 
 static char kRSMenuController;
 
-@dynamic menuController;
-
 - (RSMenuController *)menuController
 {
-	return objc_getAssociatedObject(self, &kRSMenuController);
+	RSMenuController *controller = objc_getAssociatedObject(self, &kRSMenuController);
+	if (!controller) {
+		controller = self.parentViewController.menuController;
+	}
+	return controller;
 }
 
 - (void)setMenuController:(RSMenuController *)menuController
 {
-	if ([self respondsToSelector:@selector(viewControllers)]) {
-		NSArray *viewControllers = [(UINavigationController *)self viewControllers];
-		[viewControllers setValue:menuController forKeyPath:@"menuController"];
-	}
 	objc_setAssociatedObject(self, &kRSMenuController, menuController, OBJC_ASSOCIATION_ASSIGN);
 }
 
-- (void)RS_hide
+- (void)RS_hide:(NSTimeInterval)delay
 {
-	if ([self.view superview]) {
-		[self.view removeFromSuperview];
+	if (self.parentViewController) {
 		[self removeFromParentViewController];
+		if ([self isViewLoaded]) {
+			[NSObject cancelPreviousPerformRequestsWithTarget:self.view selector:@selector(removeFromSuperview) object:nil];
+			[self.view performSelector:@selector(removeFromSuperview) withObject:nil afterDelay:delay];
+		}
 		RMLog(@"hide vc %@", self);
 	}
 }
 
 - (void)RS_show:(UIView *)below
 {
-	if (![self.view superview]) {
+	if (![self parentViewController]) {
 		UIView *superview = self.menuController.view;
 		CGRect rect = superview.bounds;
 		self.view.frame = rect;
+		[self.view RS_showShadow:self.menuController.foldedShadowRadius];
 		RMLog(@"show vc %@", self);
 		[superview insertSubview:self.view belowSubview:below];
+		[NSObject cancelPreviousPerformRequestsWithTarget:self.view selector:@selector(removeFromSuperview) object:nil];
 		[self.menuController addChildViewController:self];
 	}
 }
@@ -90,11 +93,15 @@ static char kRSMenuController;
 
 @end
 
+
+static NSString *ViewFrameKey = @"view.frame";
+
 @interface RSMenuController () <UIGestureRecognizerDelegate, UINavigationControllerDelegate>
 
 @property (nonatomic, weak) id<UINavigationControllerDelegate> originalNavigationControllerDelegate;
 @property (nonatomic, weak) UIViewController *currentFold;
 @property (nonatomic, weak) UIViewController *panning;
+@property (nonatomic, strong, readwrite) UIViewController *topViewController;
 
 @property (nonatomic) CGFloat panOriginX;
 @property (nonatomic) CGRect activeFrame;
@@ -104,10 +111,6 @@ static char kRSMenuController;
 
 @implementation RSMenuController
 {
-	BOOL reachLeftEnd;
-	BOOL reachRightEnd;
-	BOOL showingLeftView;
-	BOOL showingRightView;
 	__weak RSPanLeftRightGestureRecognizer *_pan;
 	__weak RSSwipeGestureRecognizer *_swipe;
 	NSArray *stops;
@@ -118,6 +121,7 @@ static char kRSMenuController;
 	if (self = [super init]) {
 		self.margin = margin;
 		_rootViewController = controller;
+		_rootViewController.menuController = self;
 		_resistanceForce = 15.0f;
 		_swipeDuration = .25f;
 		_bounceDuration = .2f;
@@ -125,6 +129,11 @@ static char kRSMenuController;
 		_keepSpeed = YES;
 	}
 	return self;
+}
+
+- (void)dealloc
+{
+	self.topViewController = nil;
 }
 
 - (void)setMargin:(CGFloat)margin
@@ -145,20 +154,24 @@ static char kRSMenuController;
 
 - (void)setLeftViewControllers:(NSArray *)leftViewControllers
 {
-	for (UIViewController *vc in _leftViewControllers)
+	for (UIViewController *vc in _leftViewControllers) {
 		vc.menuController = nil;
+	}
 	_leftViewControllers = leftViewControllers;
-	for (UIViewController *vc in _leftViewControllers)
+	for (UIViewController *vc in _leftViewControllers) {
 		vc.menuController = self;
+	}
 }
 
 - (void)setRightViewControllers:(NSArray *)rightViewControllers
 {
-	for (UIViewController *vc in _rightViewControllers)
+	for (UIViewController *vc in _rightViewControllers) {
 		vc.menuController = nil;
+	}
 	_rightViewControllers = rightViewControllers;
-	for (UIViewController *vc in _rightViewControllers)
+	for (UIViewController *vc in _rightViewControllers) {
 		vc.menuController = self;
+	}
 }
 
 - (void)setRootViewControllers:(NSArray *)rootViewControllers
@@ -188,16 +201,63 @@ static char kRSMenuController;
 	return [_rootViewController viewControllers];
 }
 
+- (void)setTopIndex:(NSInteger)topIndex
+{
+	static NSString *key = @"topIndex";
+	[self willChangeValueForKey:key];
+	_topIndex = topIndex;
+	[self didChangeValueForKey:key];
+	CGRect frame = self.view.bounds;
+	if (topIndex == 0) {
+		_swipe.enabled = NO;
+		_activeFrame = frame;
+	} else {
+		_swipe.enabled = YES;
+		frame.size.width -= _margin;
+		if (topIndex > 0) frame.origin.x = _margin;
+		_activeFrame = frame;
+	}
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+	if (object == _topViewController && [keyPath isEqualToString:ViewFrameKey]) {
+		CGFloat x = [change[NSKeyValueChangeNewKey] CGRectValue].origin.x;
+		CGFloat x0 = [change[NSKeyValueChangeOldKey] CGRectValue].origin.x;
+		if ((x > 0 && x0 > 0) || (x < 0 && x0 < 0)) {
+			return;
+		}
+		
+		if (_topIndex == 0) {
+			if (x > 0 && _leftViewControllers.count > 0) {
+				[_leftViewControllers[0] RS_show:_topViewController.view];
+				if (_rightViewControllers.count) [_rightViewControllers[0] RS_hide:self.swipeDuration];
+			}
+			if (x < 0 && _rightViewControllers.count > 0) {
+				[_rightViewControllers[0] RS_show:_topViewController.view];
+				if (_leftViewControllers.count) [_leftViewControllers[0] RS_hide:self.swipeDuration];
+			}
+		} else if (_topIndex < 0 && _leftViewControllers.count > -_topIndex) {
+			if (x > 0) [_leftViewControllers[-_topIndex] RS_show:_topViewController.view];
+			else [_leftViewControllers[-_topIndex] RS_hide:self.swipeDuration];
+		} else if (_topIndex > 0 && _rightViewControllers.count > _topIndex) {
+			if (x < 0) [_rightViewControllers[_topIndex] RS_show:_topViewController.view];
+			else [_rightViewControllers[_topIndex] RS_hide:self.swipeDuration];
+		}
+	}
+}
+
 #pragma mark - View Lifecycle
 - (void)viewDidLoad
 {
 	[super viewDidLoad];
-	self.view.backgroundColor = [UIColor clearColor];
+	[self.view RS_showShadow:_foldedShadowRadius];
+	
 	_rootViewController.view.frame = self.view.bounds;
 	[self.view addSubview:_rootViewController.view];
 	[self addChildViewController:_rootViewController];
+	self.topViewController = _rootViewController;
 	
-	[self showViewController:_rootViewController animated:NO completion:nil];
 	UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tap:)];
 	_tap = tap;
 	_tap.delegate = self;
@@ -211,7 +271,6 @@ static char kRSMenuController;
 	RSPanLeftRightGestureRecognizer *pan = [[RSPanLeftRightGestureRecognizer alloc] initWithTarget:self action:@selector(pan:)];
 	pan.delegate = self;
 	[self.view addGestureRecognizer:_pan = pan];
-	
 	[_pan requireGestureRecognizerToFail:_swipe];
 	[_tap requireGestureRecognizerToFail:_pan];
 }
@@ -236,60 +295,37 @@ static char kRSMenuController;
 	}
 }
 
-- (void)moveViewControllersAccordingToTopIndexAnimated:(BOOL)animated except:(UIViewController *)except completion:(void(^)(BOOL))completion
+- (void)moveViewControllersAccordingToTopIndex:(NSInteger)topIndex except:(UIViewController *)except animated:(BOOL)animated completion:(void(^)(BOOL))completion
 {
 	CGFloat width = self.view.bounds.size.width;
-	if (_topIndex > 0) {
-		[self toggleViewControllersDirection:RSMenuPanDirectionRight];
-		for (int i = 0; i < MAX(0, _topIndex - 2); i++) {
-			UIViewController *viewController = [self viewControllerAtIndex:i];
-			if (viewController != except) {
-				[self moveViewController:viewController toX:-width animated:animated completion:completion];
-			}
-		}
-		UIViewController *viewController = [self viewControllerAtIndex:_topIndex - 1];
-		if (viewController != except) {
-			[self moveViewController:viewController toX:_margin - width animated:animated completion:completion];
-		}
-		if (_topIndex - 2 >= 0) {
-			UIViewController *viewController = [self viewControllerAtIndex:_topIndex - 2];
-			if (viewController != except) {
-				[self moveViewController:viewController toX:_margin / 3 - width animated:animated completion:completion];
-			}
-		}
-		for (int i = _topIndex + 1; i < self.leftViewControllers.count + 1; i++) {
-			UIViewController *viewController = [self viewControllerAtIndex:i];
-			if (viewController != except) {
-				[self moveViewController:viewController toX:0 animated:NO completion:completion];
-			}
-		}
-	} else if (_topIndex < 0) {
-		[self toggleViewControllersDirection:RSMenuPanDirectionLeft];
-		for (int i = 0; i < MIN(0, -_topIndex - 2); i++) {
-			UIViewController *viewController = [self viewControllerAtIndex:-i];
-			if (viewController != except) {
-				[self moveViewController:viewController toX:width animated:animated completion:completion];
-			}
-		}
-		UIViewController *viewController = [self viewControllerAtIndex:_topIndex + 1];
-		if (viewController != except) {
-			[self moveViewController:viewController toX:width - _margin animated:animated completion:completion];
-		}
-		if (_topIndex + 2 <= 0) {
-			UIViewController *viewController = [self viewControllerAtIndex:_topIndex + 2];
-			if (viewController != except) {
-				[self moveViewController:viewController toX:width - _margin / 3 animated:animated completion:completion];
-			}
-		}
-		for (int i = _topIndex - 1; i > -self.leftViewControllers.count - 1; i--) {
-			UIViewController *viewController = [self viewControllerAtIndex:i];
-			if (viewController != except) {
-				[self moveViewController:viewController toX:0 animated:NO completion:completion];
-			}
-		}
+	NSInteger index = abs(topIndex);
+	RSMenuPanDirection direction;
+	NSMutableArray *controllers = [NSMutableArray arrayWithObject:_rootViewController];
+	if (topIndex > 0) {
+		direction = RSMenuPanDirectionRight;
+		[controllers addObjectsFromArray:_rightViewControllers];
+	} else if (topIndex < 0) {
+		direction = RSMenuPanDirectionLeft;
+		[controllers addObjectsFromArray:_leftViewControllers];
 	} else {
-		if (_rootViewController != except) {
-			[self moveViewController:_rootViewController toX:0 animated:animated completion:completion];
+		direction = RSMenuPanDirectionNone;
+	}
+	
+	UIViewController *viewController;
+	
+	for (NSUInteger i = 0; i < controllers.count; i++) {
+		viewController = controllers[i];
+		if (viewController == except) continue;
+		if (i == index) {
+			[self moveViewController:viewController toX:0 animated:animated completion:nil];
+		} else if (i == index - 1) {
+			[self moveViewController:viewController toX:(width - _margin) * direction animated:animated completion:completion];
+		} else if (i == index - 2) {
+			[self moveViewController:viewController toX:(width - _margin / 3) * direction animated:animated completion:nil];
+		} else {
+			[self moveViewController:viewController toX:width * direction animated:animated completion:^(BOOL complete) {
+				if (complete) [viewController RS_hide:0];
+			}];
 		}
 	}
 }
@@ -297,14 +333,10 @@ static char kRSMenuController;
 - (void)showViewController:(UIViewController *)controller animated:(BOOL)animated completion:(dispatch_block_t)block
 {
 	if (_topViewController != controller) {
-		RMLog(@"setTop in showViewController:animated:");
-		[self setTopViewController:controller];
-		[self moveViewControllersAccordingToTopIndexAnimated:animated except:_topViewController completion:^(BOOL success) {
+		[self moveViewControllersAccordingToTopIndex:[self indexOfController:controller] except:nil animated:animated completion:^(BOOL success) {
 			if (block) block();
 		}];
-		[self moveViewController:_topViewController toX:0 animated:animated completion:^(BOOL finished) {
-			[self reloadViewControllersIfNecessary:YES];
-		}];
+		self.topViewController = controller;
 	}
 }
 
@@ -313,69 +345,53 @@ static char kRSMenuController;
 	[self showViewController:controller animated:animated completion:nil];
 }
 
-- (void)hideRootViewController:(BOOL)animated
-{
-	[self hideRootViewController:animated completion:nil];
-}
 
-- (void)hideRootViewController:(BOOL)animated completion:(dispatch_block_t)completion
+- (NSInteger)indexOfController:(UIViewController *)controller
 {
-	CGFloat width = self.view.bounds.size.width;
-	[self moveViewController:_rootViewController toX:width animated:animated completion:^(BOOL finished) {
-		[self reloadViewControllersIfNecessary:YES];
-		if (completion) completion();
-	}];
-}
-
-- (void)showRootViewController:(BOOL)animated
-{
-	[self showRootViewController:animated completion:nil];
-}
-
-- (void)showRootViewController:(BOOL)animated completion:(dispatch_block_t)completion
-{
-	CGFloat width = self.view.bounds.size.width;
-	[self moveViewController:_rootViewController toX:width - self.margin animated:animated completion:^(BOOL finished) {
-		[self reloadViewControllersIfNecessary:YES];
-		if (completion) completion();
-	}];
+	if (controller == _rootViewController) return 0;
+	if (self.leftViewControllers) {
+		NSUInteger index = [self.leftViewControllers indexOfObject:controller];
+		if (index != NSNotFound) {
+			return -index - 1;
+		}
+	}
+	if (self.rightViewControllers) {
+		NSUInteger index = [self.rightViewControllers indexOfObject:controller];
+		if (index != NSNotFound) {
+			return index + 1;
+		}
+	}
+	return NSNotFound;
 }
 
 - (void)setTopViewController:(UIViewController *)controller
 {
-	if (!controller) return;
+	if (_topViewController)	[_topViewController removeObserver:self forKeyPath:ViewFrameKey];
 	_topViewController = controller;
+	if (!controller) return;
+	
+	[_topViewController addObserver:self forKeyPath:ViewFrameKey options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld context:nil];
 	_topViewController.view.userInteractionEnabled = YES;
-	_topViewController.menuController = self;
 	RMLog(@"new top %@", _topViewController);
-	if (_topViewController == _rootViewController) {
-		_topIndex = 0;
-		reachLeftEnd = self.leftViewControllers.count == 0;
-		reachRightEnd = self.rightViewControllers.count == 0;
+	if (controller == _rootViewController) {
+		self.topIndex = 0;
 		_currentFold = nil;
-		_swipe.enabled = NO;
 		_pan.directions = UISwipeGestureRecognizerDirectionLeft | UISwipeGestureRecognizerDirectionRight;
-		_activeFrame = self.view.bounds;
 		RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
 		
 		return;
 	}
 	
 	if (self.leftViewControllers) {
-		NSUInteger index = [self.leftViewControllers indexOfObject:_topViewController];
+		NSUInteger index = [self.leftViewControllers indexOfObject:controller];
 		if (index != NSNotFound) {
-			reachLeftEnd = index == self.leftViewControllers.count - 1;
-			reachRightEnd = NO;
-			_topIndex = -index - 1;
-			_swipe.enabled = YES;
+			self.topIndex = -index - 1;
 			_pan.directions = 0;
 			_swipe.direction = UISwipeGestureRecognizerDirectionLeft;
-			CGRect frame = self.view.bounds;
-			_activeFrame = CGRectMake(0, 0, frame.size.width - _margin, frame.size.height);
 			if (index == 0) {
 				_currentFold = _rootViewController;
 			} else {
-				_currentFold = (self.leftViewControllers)[index - 1];
+				_currentFold = self.leftViewControllers[index - 1];
 			}
 			_currentFold.view.userInteractionEnabled = NO;
 			RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
@@ -384,20 +400,15 @@ static char kRSMenuController;
 	}
 	
 	if (self.rightViewControllers) {
-		NSUInteger index = [self.rightViewControllers indexOfObject:_topViewController];
+		NSUInteger index = [self.rightViewControllers indexOfObject:controller];
 		if (index != NSNotFound) {
-			reachLeftEnd = NO;
-			reachRightEnd = index == self.rightViewControllers.count - 1;
-			_topIndex = index + 1;
-			_swipe.enabled = YES;
+			self.topIndex = index + 1;
 			_pan.directions = 0;
 			_swipe.direction = UISwipeGestureRecognizerDirectionRight;
-			CGRect frame = self.view.bounds;
-			_activeFrame = CGRectMake(_margin, 0, frame.size.width - _margin, frame.size.height);
 			if (index == 0) {
 				_currentFold = _rootViewController;
 			} else {
-				_currentFold = (self.rightViewControllers)[index - 1];
+				_currentFold = self.rightViewControllers[index - 1];
 			}
 			_currentFold.view.userInteractionEnabled = NO;
 			RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
@@ -421,87 +432,20 @@ static char kRSMenuController;
 	[self showViewController:_rootViewController animated:NO completion:nil];
 }
 
-- (void)_toggleViewControllersFromCurrentPosition:(NSArray *)array
-{
-	BOOL start = NO;
-	__weak UIView *view = self.rootViewController.view;
-	for (UIViewController *vc in array) {
-		if (vc != _topViewController) {
-			if (start) {
-				RMLog(@"hide vc %@", vc);
-				[vc RS_hide];
-			} else {
-				[vc RS_show:view];
-			}
-		} else {
-			start = YES;
-			[vc RS_show:view];
-		}
-	}
-}
-
 #pragma mark - GestureRecognizers
-- (void)toggleViewControllersDirection:(RSMenuPanDirection)dir
+- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated completion:(void (^)(BOOL complete))block
 {
-	showingRightView = dir == RSMenuPanDirectionRight;
-	showingLeftView = dir == RSMenuPanDirectionLeft;
-	UIView *view = self.rootViewController.view;
-	
-	if (dir == RSMenuPanDirectionLeft) {
-		for (UIViewController *vc in _rightViewControllers) [vc RS_hide];
-		for (UIViewController *vc in _leftViewControllers) {
-			[vc RS_show:view];
-			view = vc.view;
-		}
-	} else if (dir == RSMenuPanDirectionRight) {
-		for (UIViewController *vc in _leftViewControllers) [vc RS_hide];
-		for (UIViewController *vc in _rightViewControllers) {
-			[vc RS_show:view];
-			view = vc.view;
-		}
-	} else {
-		for (UIViewController *vc in _leftViewControllers) [vc RS_hide];
-		for (UIViewController *vc in _rightViewControllers) [vc RS_hide];
-	}
-}
-
-- (void)reloadViewControllersIfNecessary:(BOOL)reset
-{
-	CGFloat x = _rootViewController.view.frame.origin.x;
-	if (x > 0.0f) {
-		return [self toggleViewControllersDirection:RSMenuPanDirectionLeft];
-	}
-	if (x < 0.0f) {
-		return [self toggleViewControllersDirection:RSMenuPanDirectionRight];
-	}
-	if (reset) {
-		[self toggleViewControllersDirection:RSMenuPanDirectionNone];
-	}
-}
-
-- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated completion:(void (^)(BOOL))block
-{
-	if (!viewController) {
+	if (!viewController || !viewController.isViewLoaded) {
 		if (block) block(NO);
 		return;
 	}
-	
-	[viewController.view RS_showShadow:_foldedShadowRadius];
-	
 	CGRect frame = viewController.view.frame;
-	if (viewController == _topViewController && ((destX > 0.0f && reachLeftEnd) || (destX < 0.0f && reachRightEnd))) {
-		if (frame.origin.x == 0.0f) {
-			if (block) block(NO);
-			return;
-		}
-		frame.origin.x = 0.0f;
-	} else {
-		if (frame.origin.x == destX) {
-			if (block) block(NO);
-			return;
-		}
-		frame.origin.x = destX;
+	
+	if (frame.origin.x == destX) {
+		if (block) block(NO);
+		return;
 	}
+	frame.origin.x = destX;
 	if (frame.origin.x != 0 && viewController.view.userInteractionEnabled) {
 		viewController.view.userInteractionEnabled = NO;
 	}
@@ -528,16 +472,10 @@ static char kRSMenuController;
 - (BOOL)panningLockedOnController:(UIViewController *)controller direction:(RSMenuPanDirection)dir
 {
 	if (dir == RSMenuPanDirectionRight) {
-		if (showingLeftView) {
-			if (reachLeftEnd || controller == _currentFold) return YES;
-		}
-		return NO;
+		return _topIndex < 0 && (-_topIndex >= _leftViewControllers.count || controller == _currentFold);
 	}
 	if (dir == RSMenuPanDirectionLeft) {
-		if (showingRightView) {
-			if (reachRightEnd || controller == _currentFold) return YES;
-		}
-		return NO;
+		return _topIndex > 0 && (_topIndex >= _rightViewControllers.count || controller == _currentFold);
 	}
 	return YES;
 }
@@ -554,7 +492,6 @@ static char kRSMenuController;
 	CALayer *layer = controller.view.layer;
 	[CATransaction begin];
 	[CATransaction setCompletionBlock:^{
-		[self reloadViewControllersIfNecessary:YES];
 		self.view.userInteractionEnabled = YES;
 	}];
 	
@@ -615,13 +552,13 @@ static char kRSMenuController;
 		destX = _destX;
 	}
 	if (destX == _panOriginX) {
-		[self setTopViewController:controller];
+		self.topViewController = controller;
 	} else {
-		[self setTopViewController:[self viewControllerAtIndex:_topIndex + direction]];
+		self.topViewController = [self viewControllerAtIndex:_topIndex + direction];
 	}
 	
 	if (controller != _rootViewController) {
-		[self moveViewControllersAccordingToTopIndexAnimated:YES except:controller completion:nil];
+		[self moveViewControllersAccordingToTopIndex:_topIndex except:controller animated:YES completion:nil];
 	}
 	
 	[self endAnimationOnViewController:controller destX:destX];
@@ -666,13 +603,10 @@ static char kRSMenuController;
 		if (_panOriginX > 0) destX = MAX(0, destX);
 		if (_panOriginX < 0) destX = MIN(0, destX);
 		
-		if (_panning == _rootViewController) {
-			[self moveViewController:_rootViewController toX:destX animated:NO];
-			[self reloadViewControllersIfNecessary:NO];
-		} else {
+		if (_panning != _rootViewController) {
 			if (destX > _panOriginX) {
 				if ([self panningLockedOnController:_panning direction:RSMenuPanDirectionRight]) {
-					if (showingLeftView) {
+					if (_topIndex < 0) {
 						destX = frame.origin.x + translation.x / _resistanceForce;
 					} else {
 						destX = _panOriginX;
@@ -680,16 +614,17 @@ static char kRSMenuController;
 				}
 			} else if (destX < _panOriginX) {
 				if ([self panningLockedOnController:_panning direction:RSMenuPanDirectionLeft]) {
-					if (showingRightView) {
+					if (_topIndex > 0) {
 						destX = frame.origin.x + translation.x / _resistanceForce;
 					} else {
 						destX = _panOriginX;
 					}
 				}
 			}
-			frame.origin.x = destX;
-			_panning.view.frame = frame;
 		}
+		frame.origin.x = destX;
+		_panning.view.frame = frame;
+		
 	} else if (gesture.state == UIGestureRecognizerStateEnded) {
 		if (_panning) {
 			CGFloat velocity = [gesture velocityInView:self.view].x;
@@ -770,6 +705,33 @@ static char kRSMenuController;
 {
 	[self showViewController:_rootViewController animated:YES completion:nil];
 	navigationController.delegate = _originalNavigationControllerDelegate;
+	_originalNavigationControllerDelegate = nil;
+}
+
+- (void)hideRootViewController:(BOOL)animated
+{
+	[self hideRootViewController:animated completion:nil];
+}
+
+- (void)hideRootViewController:(BOOL)animated completion:(dispatch_block_t)completion
+{
+	CGFloat width = self.view.bounds.size.width;
+	[self moveViewController:self.rootViewController toX:width animated:animated completion:^(BOOL finished) {
+		if (completion) completion();
+	}];
+}
+
+- (void)showRootViewController:(BOOL)animated
+{
+	[self showRootViewController:animated completion:nil];
+}
+
+- (void)showRootViewController:(BOOL)animated completion:(dispatch_block_t)completion
+{
+	CGFloat width = self.view.bounds.size.width;
+	[self moveViewController:self.rootViewController toX:width - self.margin animated:animated completion:^(BOOL finished) {
+		if (completion) completion();
+	}];
 }
 
 @end
