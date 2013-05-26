@@ -417,22 +417,6 @@ static NSString *ViewFrameKey = @"view.frame";
 	}
 }
 
-- (UIViewController *)oneViewControllerLeft
-{
-	return [self viewControllerAtIndex:_topIndex - 1];
-}
-
-- (UIViewController *)oneViewControllerRight
-{
-	return [self viewControllerAtIndex:_topIndex + 1];
-}
-
-- (void)showRootController
-{
-	[self showViewController:_rootViewController animated:NO completion:nil];
-}
-
-#pragma mark - GestureRecognizers
 - (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated completion:(void (^)(BOOL complete))block
 {
 	if (!viewController || !viewController.isViewLoaded) {
@@ -469,6 +453,7 @@ static NSString *ViewFrameKey = @"view.frame";
 	[self moveViewController:viewController toX:destX animated:animated completion:nil];
 }
 
+#pragma mark - GestureRecognizers
 - (BOOL)panningLockedOnController:(UIViewController *)controller direction:(RSMenuPanDirection)dir
 {
 	if (dir == RSMenuPanDirectionRight) {
@@ -706,6 +691,26 @@ static NSString *ViewFrameKey = @"view.frame";
 	[self showViewController:_rootViewController animated:YES completion:nil];
 	navigationController.delegate = _originalNavigationControllerDelegate;
 	_originalNavigationControllerDelegate = nil;
+}
+
+@end
+
+
+@implementation RSMenuController (Utils)
+
+- (void)showRootController
+{
+	[self showViewController:_rootViewController animated:NO completion:nil];
+}
+
+- (UIViewController *)oneViewControllerLeft
+{
+	return [self viewControllerAtIndex:_topIndex - 1];
+}
+
+- (UIViewController *)oneViewControllerRight
+{
+	return [self viewControllerAtIndex:_topIndex + 1];
 }
 
 - (void)hideRootViewController:(BOOL)animated
