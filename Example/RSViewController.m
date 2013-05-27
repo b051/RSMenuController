@@ -23,7 +23,14 @@
 	label.textAlignment = UITextAlignmentCenter;
 	label.font = [UIFont boldSystemFontOfSize:30];
 	label.backgroundColor = [UIColor clearColor];
+	label.userInteractionEnabled = YES;
 	[self.view addSubview:_label = label];
+	[label addGestureRecognizer:[[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tap:)]];
+}
+
+- (void)tap:(UITapGestureRecognizer *)tap
+{
+	[[[UIAlertView alloc] initWithTitle:@"tap" message:self.description delegate:nil cancelButtonTitle:@"Close" otherButtonTitles:nil] show];
 }
 
 - (void)viewWillAppear:(BOOL)animated

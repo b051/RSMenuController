@@ -114,6 +114,7 @@ static NSString *ViewFrameKey = @"view.frame";
 	__weak RSPanLeftRightGestureRecognizer *_pan;
 	__weak RSSwipeGestureRecognizer *_swipe;
 	NSArray *_stops;
+	CGFloat _invisibleMargin;
 }
 
 - (id)initWithRootViewController:(UINavigationController *)controller margin:(CGFloat)margin
@@ -122,6 +123,7 @@ static NSString *ViewFrameKey = @"view.frame";
 		self.margin = margin;
 		_rootViewController = controller;
 		_rootViewController.menuController = self;
+		[_rootViewController addObserver:self forKeyPath:ViewFrameKey options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld context:nil];
 		_resistanceForce = 15.0f;
 		_swipeDuration = .25f;
 		_bounceDuration = .2f;
@@ -133,12 +135,13 @@ static NSString *ViewFrameKey = @"view.frame";
 
 - (void)dealloc
 {
-	self.topViewController = nil;
+	[_rootViewController removeObserver:self forKeyPath:ViewFrameKey];
 }
 
 - (void)setMargin:(CGFloat)margin
 {
 	_margin = margin;
+	_invisibleMargin = margin * 2;
 	[self addRootViewControllerAnimationStop:-margin];
 }
 
@@ -156,10 +159,12 @@ static NSString *ViewFrameKey = @"view.frame";
 {
 	for (UIViewController *vc in _leftViewControllers) {
 		vc.menuController = nil;
+		[vc removeObserver:self forKeyPath:ViewFrameKey];
 	}
 	_leftViewControllers = leftViewControllers;
 	for (UIViewController *vc in _leftViewControllers) {
 		vc.menuController = self;
+		[vc addObserver:self forKeyPath:ViewFrameKey options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld context:nil];
 	}
 }
 
@@ -167,10 +172,12 @@ static NSString *ViewFrameKey = @"view.frame";
 {
 	for (UIViewController *vc in _rightViewControllers) {
 		vc.menuController = nil;
+		[vc removeObserver:self forKeyPath:ViewFrameKey];
 	}
 	_rightViewControllers = rightViewControllers;
 	for (UIViewController *vc in _rightViewControllers) {
 		vc.menuController = self;
+		[vc addObserver:self forKeyPath:ViewFrameKey options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld context:nil];
 	}
 }
 
@@ -219,30 +226,31 @@ static NSString *ViewFrameKey = @"view.frame";
 	}
 }
 
-- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(UIViewController *)object change:(NSDictionary *)change context:(void *)context
 {
-	if (object == _topViewController && [keyPath isEqualToString:ViewFrameKey]) {
+	if ([keyPath isEqualToString:ViewFrameKey]) {
 		CGFloat x = [change[NSKeyValueChangeNewKey] CGRectValue].origin.x;
-		CGFloat x0 = [change[NSKeyValueChangeOldKey] CGRectValue].origin.x;
-		if ((x > 0 && x0 > 0) || (x < 0 && x0 < 0)) {
-			return;
+		BOOL mostVisible = fabsf(x) < _invisibleMargin;
+		if (object.view.userInteractionEnabled != mostVisible) {
+			object.view.userInteractionEnabled = mostVisible;
 		}
-		
-		if (_topIndex == 0) {
-			if (x > 0 && _leftViewControllers.count > 0) {
-				[_leftViewControllers[0] RS_show:_topViewController.view];
-				if (_rightViewControllers.count) [_rightViewControllers[0] RS_hide:self.swipeDuration];
+		if (object == _topViewController) {
+			if (_topIndex == 0) {
+				if (x > 0 && _leftViewControllers.count > 0) {
+					[_leftViewControllers[0] RS_show:_topViewController.view];
+					if (_rightViewControllers.count) [_rightViewControllers[0] RS_hide:self.swipeDuration];
+				}
+				if (x < 0 && _rightViewControllers.count > 0) {
+					[_rightViewControllers[0] RS_show:_topViewController.view];
+					if (_leftViewControllers.count) [_leftViewControllers[0] RS_hide:self.swipeDuration];
+				}
+			} else if (_topIndex < 0 && _leftViewControllers.count > -_topIndex) {
+				if (x > 0) [_leftViewControllers[-_topIndex] RS_show:_topViewController.view];
+				else [_leftViewControllers[-_topIndex] RS_hide:self.swipeDuration];
+			} else if (_topIndex > 0 && _rightViewControllers.count > _topIndex) {
+				if (x < 0) [_rightViewControllers[_topIndex] RS_show:_topViewController.view];
+				else [_rightViewControllers[_topIndex] RS_hide:self.swipeDuration];
 			}
-			if (x < 0 && _rightViewControllers.count > 0) {
-				[_rightViewControllers[0] RS_show:_topViewController.view];
-				if (_leftViewControllers.count) [_leftViewControllers[0] RS_hide:self.swipeDuration];
-			}
-		} else if (_topIndex < 0 && _leftViewControllers.count > -_topIndex) {
-			if (x > 0) [_leftViewControllers[-_topIndex] RS_show:_topViewController.view];
-			else [_leftViewControllers[-_topIndex] RS_hide:self.swipeDuration];
-		} else if (_topIndex > 0 && _rightViewControllers.count > _topIndex) {
-			if (x < 0) [_rightViewControllers[_topIndex] RS_show:_topViewController.view];
-			else [_rightViewControllers[_topIndex] RS_hide:self.swipeDuration];
 		}
 	}
 }
@@ -251,9 +259,9 @@ static NSString *ViewFrameKey = @"view.frame";
 - (void)viewDidLoad
 {
 	[super viewDidLoad];
-	[self.view RS_showShadow:_foldedShadowRadius];
-	
 	_rootViewController.view.frame = self.view.bounds;
+	[_rootViewController.view RS_showShadow:_foldedShadowRadius];
+
 	[self.view addSubview:_rootViewController.view];
 	[self addChildViewController:_rootViewController];
 	self.topViewController = _rootViewController;
@@ -366,17 +374,9 @@ static NSString *ViewFrameKey = @"view.frame";
 
 - (void)setTopViewController:(UIViewController *)controller
 {
-	if (_topViewController)	[_topViewController removeObserver:self forKeyPath:ViewFrameKey];
 	_topViewController = controller;
 	if (!controller) return;
 	
-	[_topViewController addObserver:self forKeyPath:ViewFrameKey options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld context:nil];
-	if (_topViewController.view.userInteractionEnabled) {
-		RMLog(@"duplicate1");
-	} else {
-		RMLog(@"necessary1");
-	}
-	_topViewController.view.userInteractionEnabled = YES;
 	RMLog(@"new top %@", _topViewController);
 	if (controller == _rootViewController) {
 		self.topIndex = 0;
@@ -398,12 +398,6 @@ static NSString *ViewFrameKey = @"view.frame";
 			} else {
 				_currentFold = self.leftViewControllers[index - 1];
 			}
-			if (!_currentFold.view.userInteractionEnabled) {
-				RMLog(@"duplicate2");
-			} else {
-				RMLog(@"necessary2");
-			}
-			_currentFold.view.userInteractionEnabled = NO;
 			RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
 			return;
 		}
@@ -420,12 +414,6 @@ static NSString *ViewFrameKey = @"view.frame";
 			} else {
 				_currentFold = self.rightViewControllers[index - 1];
 			}
-			if (!_currentFold.view.userInteractionEnabled) {
-				RMLog(@"duplicate5");
-			} else {
-				RMLog(@"necessary5");
-			}
-			_currentFold.view.userInteractionEnabled = NO;
 			RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
 			return;
 		}
@@ -444,20 +432,17 @@ static NSString *ViewFrameKey = @"view.frame";
 		if (block) block(NO);
 		return;
 	}
-	frame.origin.x = destX;
-	if (frame.origin.x != 0 && controller.view.userInteractionEnabled) {
-		controller.view.userInteractionEnabled = NO;
-	}
 	if (animated) {
 		self.view.userInteractionEnabled = NO;
 		
-		CGRect frame = controller.view.frame;
 		CGFloat x = frame.origin.x;
+		frame.origin.x = destX;
 		CGFloat width = frame.size.width;
 		CGFloat span = ABS(x - destX) / width;
 		BOOL bounce = animated > 1 && _bounceDuration && span > .5;
 		CGFloat duration = _keepSpeed ? MAX(.5f, span) * _swipeDuration : _swipeDuration;
 		CALayer *layer = controller.view.layer;
+		
 		[CATransaction begin];
 		[CATransaction setCompletionBlock:^{
 			self.view.userInteractionEnabled = YES;
@@ -477,12 +462,13 @@ static NSString *ViewFrameKey = @"view.frame";
 		
 		layer.position = CGPointMake(destX, pos.y);
 		CAKeyframeAnimation *animation = [CAKeyframeAnimation animationWithKeyPath:@"position"];
-		
 		animation.calculationMode = @"cubic";
 		animation.values = values;
 		animation.duration = duration;
 		[layer addAnimation:animation forKey:nil];
+		
 		[CATransaction commit];
+		controller.view.frame = frame;
 	} else {
 		controller.view.frame = frame;
 		if (block) block(YES);
@@ -625,12 +611,6 @@ static NSString *ViewFrameKey = @"view.frame";
 		}
 		[self notifyPanEnded];
 	} else {
-		if (_topViewController.view.userInteractionEnabled) {
-			RMLog(@"duplicate4");
-		} else {
-			RMLog(@"necessary4");
-		}
-		_topViewController.view.userInteractionEnabled = YES;
 		[self notifyPanEnded];
 		_panning = nil;
 	}
