@@ -113,7 +113,7 @@ static NSString *ViewFrameKey = @"view.frame";
 {
 	__weak RSPanLeftRightGestureRecognizer *_pan;
 	__weak RSSwipeGestureRecognizer *_swipe;
-	NSArray *stops;
+	NSArray *_stops;
 }
 
 - (id)initWithRootViewController:(UINavigationController *)controller margin:(CGFloat)margin
@@ -144,11 +144,11 @@ static NSString *ViewFrameKey = @"view.frame";
 
 - (void)addRootViewControllerAnimationStop:(CGFloat)stop
 {
-	if (!stops) stops = @[@0, @(stop)];
+	if (!_stops) _stops = @[@0, @(stop)];
 	else {
-		NSMutableArray *_stops = [stops mutableCopy];
-		[_stops addObject:@(stop)];
-		stops = _stops;
+		NSMutableArray *stops = [_stops mutableCopy];
+		[stops addObject:@(stop)];
+		_stops = stops;
 	}
 }
 
@@ -313,19 +313,19 @@ static NSString *ViewFrameKey = @"view.frame";
 	
 	UIViewController *viewController;
 	
-	for (NSUInteger i = 0; i < controllers.count; i++) {
+	for (int i = 0; i < controllers.count; i++) {
 		viewController = controllers[i];
 		if (viewController == except) continue;
-		if (i == index) {
-			[self moveViewController:viewController toX:0 animated:animated completion:nil];
-		} else if (i == index - 1) {
+		if (i == index - 1) {
 			[self moveViewController:viewController toX:(width - _margin) * direction animated:animated completion:completion];
 		} else if (i == index - 2) {
 			[self moveViewController:viewController toX:(width - _margin / 3) * direction animated:animated completion:nil];
-		} else {
-			[self moveViewController:viewController toX:width * direction animated:animated completion:^(BOOL complete) {
-				if (complete) [viewController RS_hide:0];
+		} else if (i < index - 2) {
+			[self moveViewController:viewController toX:direction == width * direction animated:animated completion:^(BOOL complete) {
+				[viewController RS_hide:complete ? 0 : self.swipeDuration];
 			}];
+		} else {
+			[self moveViewController:viewController toX:0 animated:animated completion:nil];
 		}
 	}
 }
@@ -371,6 +371,11 @@ static NSString *ViewFrameKey = @"view.frame";
 	if (!controller) return;
 	
 	[_topViewController addObserver:self forKeyPath:ViewFrameKey options:NSKeyValueObservingOptionNew | NSKeyValueObservingOptionOld context:nil];
+	if (_topViewController.view.userInteractionEnabled) {
+		RMLog(@"duplicate1");
+	} else {
+		RMLog(@"necessary1");
+	}
 	_topViewController.view.userInteractionEnabled = YES;
 	RMLog(@"new top %@", _topViewController);
 	if (controller == _rootViewController) {
@@ -393,6 +398,11 @@ static NSString *ViewFrameKey = @"view.frame";
 			} else {
 				_currentFold = self.leftViewControllers[index - 1];
 			}
+			if (!_currentFold.view.userInteractionEnabled) {
+				RMLog(@"duplicate2");
+			} else {
+				RMLog(@"necessary2");
+			}
 			_currentFold.view.userInteractionEnabled = NO;
 			RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
 			return;
@@ -410,6 +420,11 @@ static NSString *ViewFrameKey = @"view.frame";
 			} else {
 				_currentFold = self.rightViewControllers[index - 1];
 			}
+			if (!_currentFold.view.userInteractionEnabled) {
+				RMLog(@"duplicate5");
+			} else {
+				RMLog(@"necessary5");
+			}
 			_currentFold.view.userInteractionEnabled = NO;
 			RMLog(@"new topIndex %d currentFold %@", _topIndex, _currentFold);
 			return;
@@ -417,38 +432,64 @@ static NSString *ViewFrameKey = @"view.frame";
 	}
 }
 
-- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated completion:(void (^)(BOOL complete))block
+- (void)moveViewController:(UIViewController *)controller toX:(CGFloat)destX animated:(NSUInteger)animated completion:(void (^)(BOOL complete))block
 {
-	if (!viewController || !viewController.isViewLoaded) {
+	if (!controller || !controller.isViewLoaded) {
 		if (block) block(NO);
 		return;
 	}
-	CGRect frame = viewController.view.frame;
+	CGRect frame = controller.view.frame;
 	
 	if (frame.origin.x == destX) {
 		if (block) block(NO);
 		return;
 	}
 	frame.origin.x = destX;
-	if (frame.origin.x != 0 && viewController.view.userInteractionEnabled) {
-		viewController.view.userInteractionEnabled = NO;
+	if (frame.origin.x != 0 && controller.view.userInteractionEnabled) {
+		controller.view.userInteractionEnabled = NO;
 	}
 	if (animated) {
 		self.view.userInteractionEnabled = NO;
-		[UIView animateWithDuration:_swipeDuration animations:^{
-			viewController.view.frame = frame;
-		} completion:^(BOOL finished) {
+		
+		CGRect frame = controller.view.frame;
+		CGFloat x = frame.origin.x;
+		CGFloat width = frame.size.width;
+		CGFloat span = ABS(x - destX) / width;
+		BOOL bounce = animated > 1 && _bounceDuration && span > .5;
+		CGFloat duration = _keepSpeed ? MAX(.5f, span) * _swipeDuration : _swipeDuration;
+		CALayer *layer = controller.view.layer;
+		[CATransaction begin];
+		[CATransaction setCompletionBlock:^{
 			self.view.userInteractionEnabled = YES;
-			_topViewController.view.userInteractionEnabled = YES;
-			if (block) block(finished);
+			if (block) block(YES);
 		}];
+		
+		destX += (width / 2);
+		CGPoint pos = layer.position;
+		
+		NSMutableArray *values = [[NSMutableArray alloc] initWithCapacity:bounce ? 3 : 2];
+		[values addObject:[NSValue valueWithCGPoint:pos]];
+		if (bounce) {
+			duration += _bounceDuration * span;
+			[values addObject:[NSValue valueWithCGPoint:CGPointMake(destX + 10, pos.y)]];
+		}
+		[values addObject:[NSValue valueWithCGPoint:CGPointMake(destX, pos.y)]];
+		
+		layer.position = CGPointMake(destX, pos.y);
+		CAKeyframeAnimation *animation = [CAKeyframeAnimation animationWithKeyPath:@"position"];
+		
+		animation.calculationMode = @"cubic";
+		animation.values = values;
+		animation.duration = duration;
+		[layer addAnimation:animation forKey:nil];
+		[CATransaction commit];
 	} else {
-		viewController.view.frame = frame;
+		controller.view.frame = frame;
 		if (block) block(YES);
 	}
 }
 
-- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated
+- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(NSUInteger)animated
 {
 	[self moveViewController:viewController toX:destX animated:animated completion:nil];
 }
@@ -465,45 +506,33 @@ static NSString *ViewFrameKey = @"view.frame";
 	return YES;
 }
 
-- (void)endAnimationOnViewController:(UIViewController *)controller destX:(CGFloat)destX
+- (CGFloat)closestDest:(CGFloat)destX inStops:(NSArray *)stops
 {
-    self.view.userInteractionEnabled = NO;
-	CGRect frame = controller.view.frame;
-	CGFloat x = frame.origin.x;
-	CGFloat width = frame.size.width;
-	CGFloat span = ABS(x - destX) / width;
-	BOOL bounce = _bounceDuration && span > .5;
-	CGFloat duration = _keepSpeed ? MAX(.5f, span) * _swipeDuration : _swipeDuration;
-	CALayer *layer = controller.view.layer;
-	[CATransaction begin];
-	[CATransaction setCompletionBlock:^{
-		self.view.userInteractionEnabled = YES;
+	CGFloat width = self.view.frame.size.width;
+	__block CGFloat minDiff = CGFLOAT_MAX;
+	__block	CGFloat _destX = 0;
+	void(^pop)(CGFloat x) = ^(CGFloat x) {
+		CGFloat diff = ABS(x - destX);
+		if (minDiff > diff) {
+			minDiff = diff;
+			_destX = x;
+		}
+	};
+	[stops enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
+		CGFloat x = [obj floatValue];
+		if (x < 0) {
+			if (self.leftViewControllers) pop(x + width);
+			if (self.rightViewControllers) pop(-(x + width));
+		} else {
+			pop(x);
+		}
 	}];
-	
-	destX += (width / 2);
-	CGPoint pos = layer.position;
-	CAKeyframeAnimation *animation = [CAKeyframeAnimation animationWithKeyPath:@"position"];
-	
-	NSMutableArray *values = [[NSMutableArray alloc] initWithCapacity:bounce ? 3 : 2];
-	[values addObject:[NSValue valueWithCGPoint:pos]];
-	if (bounce) {
-		duration += _bounceDuration * span;
-		[values addObject:[NSValue valueWithCGPoint:CGPointMake(destX + 10, pos.y)]];
-	}
-	[values addObject:[NSValue valueWithCGPoint:CGPointMake(destX, pos.y)]];
-	
-	layer.position = CGPointMake(destX, pos.y);
-	animation.calculationMode = @"cubic";
-	animation.values = values;
-	animation.duration = duration;
-	[layer addAnimation:animation forKey:nil];
-	[CATransaction commit];
+	return _destX;
 }
 
 - (void)endPanningOnViewController:(UIViewController *)controller velocity:(CGFloat)velocity
 {
 	velocity = velocity * _swipeDuration;
-	CGFloat width = controller.view.frame.size.width;
 	CGFloat finalX = controller.view.frame.origin.x;
 	CGFloat destX = finalX + velocity;
 	
@@ -516,37 +545,14 @@ static NSString *ViewFrameKey = @"view.frame";
 	if (ignore) {
 		destX = _panOriginX;
 	} else {
-		__block CGFloat minDiff = CGFLOAT_MAX;
-		__block	CGFloat _destX = 0;
-		void(^pop)(CGFloat x) = ^(CGFloat x) {
-			CGFloat diff = ABS(x - destX);
-			if (minDiff > diff) {
-				minDiff = diff;
-				_destX = x;
-			}
-		};
-		[stops enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL *stop) {
-			CGFloat x = [obj floatValue];
-			if (x < 0) {
-				if (self.leftViewControllers) pop(x + width);
-				if (self.rightViewControllers) pop(-(x + width));
-			} else {
-				pop(x);
-			}
-		}];
-		destX = _destX;
+		destX = [self closestDest:destX inStops:controller == _rootViewController ? _stops : @[@0, @(-_margin)]];
 	}
-	if (destX == _panOriginX) {
-		self.topViewController = controller;
-	} else {
+	if (destX != _panOriginX) {
 		self.topViewController = [self viewControllerAtIndex:_topIndex + direction];
 	}
 	
-	if (controller != _rootViewController) {
-		[self moveViewControllersAccordingToTopIndex:_topIndex except:controller animated:YES completion:nil];
-	}
-	
-	[self endAnimationOnViewController:controller destX:destX];
+	[self moveViewControllersAccordingToTopIndex:_topIndex except:controller animated:YES completion:nil];
+	[self moveViewController:controller toX:destX animated:2];
 }
 
 - (void)swipe:(RSSwipeGestureRecognizer *)gesture
@@ -619,6 +625,11 @@ static NSString *ViewFrameKey = @"view.frame";
 		}
 		[self notifyPanEnded];
 	} else {
+		if (_topViewController.view.userInteractionEnabled) {
+			RMLog(@"duplicate4");
+		} else {
+			RMLog(@"necessary4");
+		}
 		_topViewController.view.userInteractionEnabled = YES;
 		[self notifyPanEnded];
 		_panning = nil;

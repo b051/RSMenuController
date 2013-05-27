@@ -44,8 +44,8 @@ typedef NS_ENUM(NSInteger, RSMenuPanDirection) {
 - (void)showViewController:(UIViewController *)controller animated:(BOOL)animated completion:(dispatch_block_t)block;
 - (void)setRootViewControllers:(NSArray *)rootViewControllers animated:(BOOL)animated;
 
-- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated;
-- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(BOOL)animated completion:(void (^)(BOOL))block;
+- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(NSUInteger)animated;
+- (void)moveViewController:(UIViewController *)viewController toX:(CGFloat)destX animated:(NSUInteger)animated completion:(void (^)(BOOL))block;
 - (void)addRootViewControllerAnimationStop:(CGFloat)stop;
 
 @property (nonatomic, copy) NSArray *rootViewControllers;

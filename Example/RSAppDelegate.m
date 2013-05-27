@@ -11,6 +11,19 @@
 #import "RSViewController.h"
 
 @implementation RSAppDelegate
+{
+	RSMenuController *menuController;
+}
+
+- (void)openLeftMenu:(id)sender
+{
+	[menuController showViewController:[menuController oneViewControllerLeft] animated:YES completion:nil];
+}
+
+- (void)openRightMenu:(id)sender
+{
+	[menuController showViewController:[menuController oneViewControllerRight] animated:YES completion:nil];
+}
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
@@ -23,7 +36,10 @@
 		viewController.title = name;
 		return viewController;
 	};
-	RSMenuController *menuController = [[RSMenuController alloc] initWithRootViewController:[[UINavigationController alloc] initWithRootViewController:viewController(@"root")] margin:60];
+	UIViewController *rootViewController = viewController(@"root");
+	rootViewController.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"LeftMenu" style:UIBarButtonItemStylePlain target:self action:@selector(openLeftMenu:)];
+	rootViewController.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"RightMenu" style:UIBarButtonItemStylePlain target:self action:@selector(openRightMenu:)];
+	menuController = [[RSMenuController alloc] initWithRootViewController:[[UINavigationController alloc] initWithRootViewController:rootViewController] margin:60];
 	[menuController addRootViewControllerAnimationStop:45];
 	menuController.leftViewControllers = @[viewController(@"left0"), viewController(@"left1")];
 	menuController.rightViewControllers = @[viewController(@"right0"), viewController(@"right1")];
@@ -40,7 +56,7 @@
 
 - (void)applicationDidEnterBackground:(UIApplication *)application
 {
-	// Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later. 
+	// Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
 	// If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
 }
 
