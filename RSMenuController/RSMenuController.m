@@ -341,6 +341,9 @@ static NSString *ViewFrameKey = @"view.frame";
 - (void)showViewController:(UIViewController *)controller animated:(BOOL)animated completion:(dispatch_block_t)block
 {
 	if (_topViewController != controller) {
+		if (_topViewController.isViewLoaded) {
+			[_topViewController.view endEditing:YES];
+		}
 		[self moveViewControllersAccordingToTopIndex:[self indexOfController:controller] except:nil animated:animated completion:^(BOOL success) {
 			if (block) block();
 		}];
@@ -352,7 +355,6 @@ static NSString *ViewFrameKey = @"view.frame";
 {
 	[self showViewController:controller animated:animated completion:nil];
 }
-
 
 - (NSInteger)indexOfController:(UIViewController *)controller
 {
