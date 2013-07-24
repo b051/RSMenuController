@@ -23,6 +23,8 @@
 		self.layer.shadowRadius = radius;
 		self.layer.shadowColor = [UIColor blackColor].CGColor;
 		self.layer.shadowPath = [UIBezierPath bezierPathWithRect:self.bounds].CGPath;
+		self.layer.shouldRasterize = YES;
+		self.layer.rasterizationScale = [UIScreen mainScreen].scale;
 	} else {
 		self.layer.shadowRadius = 0;
 	}
