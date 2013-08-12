@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name         = "RSMenuController"
-  s.version      = "0.0.1"
+  s.version      = "1.0.1"
   s.summary      = "yet another menu tray controller like sparrow and path."
   s.homepage     = "https://github.com/b051/RSMenuController"
   s.license      = 'MIT'
